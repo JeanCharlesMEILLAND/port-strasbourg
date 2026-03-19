@@ -136,6 +136,15 @@ body {
 .sector-chip:hover { border-color:var(--glass-border-hover); }
 .sector-chip.active { background:rgba(0,153,255,0.15); border-color:var(--blue-accent); color:var(--blue-accent); }
 
+/* Rail annotation */
+.rail-field { margin-bottom:10px; }
+.rail-field label { display:block; font-size:0.68rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px; }
+.rail-field select, .rail-field input { width:100%; padding:7px 10px; border-radius:var(--radius-sm); border:1px solid var(--glass-border); background:rgba(255,255,255,0.04); color:var(--text-primary); font-size:0.82rem; font-family:inherit; outline:none; }
+.rail-field select:focus, .rail-field input:focus { border-color:var(--blue-accent); }
+.rail-field select option { background:#1a2030; color:white; }
+.rail-actions { display:flex; gap:6px; margin-top:12px; }
+.rail-highlight { position:absolute; pointer-events:none; }
+
 /* Accordion */
 .accordion-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:6px 0; }
 .accordion-header:hover .sidebar-section-title { color:var(--text-primary); }
@@ -834,6 +843,10 @@ map.on('load', function() {
   // Railway lines from IGN vector tiles (on top of everything)
   map.addLayer({id:'railway-bg',type:'line',source:'ign-vector','source-layer':'ferre',paint:{'line-color':'#1a1a1a','line-width':['interpolate',['linear'],['zoom'],10,1.5,14,3.5,17,6],'line-opacity':0.8}});
   map.addLayer({id:'railway',type:'line',source:'ign-vector','source-layer':'ferre',paint:{'line-color':'#ffffff','line-width':['interpolate',['linear'],['zoom'],10,0.8,14,1.5,17,3],'line-dasharray':[2,2],'line-opacity':0.9}});
+
+  // Highlighted rail segment
+  map.addSource('rail-highlight',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+  map.addLayer({id:'rail-highlight-line',type:'line',source:'rail-highlight',paint:{'line-color':'#FF8C00','line-width':8,'line-opacity':0.6}});
 
   // Infrastructure markers
   createInfraMarkers();
@@ -1840,6 +1853,104 @@ function rotateStep(){
 // Stop rotation on user interaction
 map.on('mousedown', function(){ if(isRotating){ isRotating=false; rotateBtn.classList.remove('active'); }});
 map.on('touchstart', function(){ if(isRotating){ isRotating=false; rotateBtn.classList.remove('active'); }});
+
+// ══════════════════════════════════════════
+// RAIL ANNOTATION SYSTEM
+// ══════════════════════════════════════════
+var railAnnotations = {};
+try { railAnnotations = JSON.parse(localStorage.getItem('pas_rail_annotations')) || {}; } catch(e){}
+
+function railKey(geom) {
+  // Create a unique key from the first 2 coordinates
+  var c = geom.coordinates || geom;
+  if (c.length < 2) return null;
+  return c[0][0].toFixed(4)+'_'+c[0][1].toFixed(4)+'_'+c[1][0].toFixed(4)+'_'+c[1][1].toFixed(4);
+}
+
+function saveRailAnnotations() {
+  localStorage.setItem('pas_rail_annotations', JSON.stringify(railAnnotations));
+}
+
+// Click on rail
+map.on('click','railway-bg',function(e){
+  if(!e.features||!e.features.length) return;
+  var feat = e.features[0];
+  var key = railKey(feat.geometry);
+  var ann = railAnnotations[key] || {};
+
+  // Highlight the segment
+  map.getSource('rail-highlight').setData({type:'FeatureCollection',features:[{type:'Feature',geometry:feat.geometry,properties:{}}]});
+
+  var panel = document.getElementById('detailPanel');
+  document.getElementById('detailBar').style.background = 'linear-gradient(90deg,#FF8C00,transparent)';
+  document.getElementById('detailName').textContent = ann.nom || 'Voie ferree';
+  document.getElementById('detailBadges').innerHTML =
+    '<span class="detail-badge" style="color:#FF8C00;border-color:rgba(255,140,0,0.3);background:rgba(255,140,0,0.1)">\u{1F682} Voie ferree</span>' +
+    (ann.etat ? '<span class="detail-badge" style="color:'+(ann.etat==='En service'?'var(--green-dispo)':'#FF8C00')+';border-color:currentColor;background:rgba(255,255,255,0.05)">'+ann.etat+'</span>' : '');
+
+  var html = '';
+  html += '<div class="rail-field"><label>Nom / identifiant</label><input id="railNom" value="'+(ann.nom||'')+'" placeholder="Ex: Voie E3 Port Sud"></div>';
+  html += '<div class="rail-field"><label>Gabarit</label><select id="railGabarit">';
+  ['','GA','GB','GB1','GB2','GC'].forEach(function(g){
+    html += '<option value="'+g+'"'+(ann.gabarit===g?' selected':'')+'>'+( g||'-- Selectionner --')+'</option>';
+  });
+  html += '</select></div>';
+  html += '<div class="rail-field"><label>Etat</label><select id="railEtat">';
+  ['','En service','Hors service','En travaux','Desaffectee'].forEach(function(e){
+    html += '<option value="'+e+'"'+(ann.etat===e?' selected':'')+'>'+( e||'-- Selectionner --')+'</option>';
+  });
+  html += '</select></div>';
+  html += '<div class="rail-field"><label>Gestionnaire</label><select id="railGest">';
+  ['','SNCF Reseau','Port Autonome de Strasbourg','Prive (ITE)','DB Netz (DE)'].forEach(function(g){
+    html += '<option value="'+g+'"'+(ann.gestionnaire===g?' selected':'')+'>'+( g||'-- Selectionner --')+'</option>';
+  });
+  html += '</select></div>';
+  html += '<div class="rail-field"><label>Longueur estimee</label><input id="railLongueur" value="'+(ann.longueur||'')+'" placeholder="Ex: 1.2 km"></div>';
+  html += '<div class="rail-field"><label>Charge max (t/essieu)</label><input id="railCharge" value="'+(ann.charge||'')+'" placeholder="Ex: 22.5"></div>';
+  html += '<div class="rail-field"><label>Notes</label><input id="railNotes" value="'+(ann.notes||'')+'" placeholder="Infos complementaires..."></div>';
+
+  html += '<div class="rail-actions">';
+  html += '<button class="detail-cta" style="flex:1" onclick="saveRailInfo(\''+key+'\')">Enregistrer</button>';
+  if(ann.nom) html += '<button class="reset-btn" style="margin:0;flex:0 0 auto;padding:11px 16px" onclick="deleteRailInfo(\''+key+'\')">Effacer</button>';
+  html += '</div>';
+
+  document.getElementById('detailBody').innerHTML = html;
+  panel.classList.add('open');
+});
+
+function saveRailInfo(key) {
+  railAnnotations[key] = {
+    nom: document.getElementById('railNom').value.trim(),
+    gabarit: document.getElementById('railGabarit').value,
+    etat: document.getElementById('railEtat').value,
+    gestionnaire: document.getElementById('railGest').value,
+    longueur: document.getElementById('railLongueur').value.trim(),
+    charge: document.getElementById('railCharge').value.trim(),
+    notes: document.getElementById('railNotes').value.trim()
+  };
+  saveRailAnnotations();
+  showToast('Voie ferree enregistree');
+  // Update title
+  document.getElementById('detailName').textContent = railAnnotations[key].nom || 'Voie ferree';
+}
+
+function deleteRailInfo(key) {
+  delete railAnnotations[key];
+  saveRailAnnotations();
+  hideDetail();
+  map.getSource('rail-highlight').setData({type:'FeatureCollection',features:[]});
+  showToast('Annotation supprimee');
+}
+
+map.on('mouseenter','railway-bg',function(){map.getCanvas().style.cursor='pointer';});
+map.on('mouseleave','railway-bg',function(){if(!editMode) map.getCanvas().style.cursor='';});
+
+// Clear rail highlight when closing detail panel
+var origHideDetail = hideDetail;
+hideDetail = function(){
+  origHideDetail();
+  if(map.getSource('rail-highlight')) map.getSource('rail-highlight').setData({type:'FeatureCollection',features:[]});
+};
 
 // ══════════════════════════════════════════
 // DELETE COMPANY
