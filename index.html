@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Port Autonome de Strasbourg — Plateforme Cartographique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+:root {
+  --dark-bg: #050f1e;
+  --glass: rgba(8,16,32,0.85);
+  --glass-border: rgba(255,255,255,0.08);
+  --glass-border-hover: rgba(255,255,255,0.15);
+  --blue-primary: #0066CC;
+  --blue-accent: #0099FF;
+  --blue-glow: rgba(0,153,255,0.25);
+  --green-dispo: #00CC88;
+  --orange-ami: #FF8C00;
+  --gray-occupe: #555566;
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255,255,255,0.65);
+  --text-muted: rgba(255,255,255,0.4);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --transition: 0.25s ease;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--dark-bg); color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:4px; }
+
+/* Loading */
+#loading {
+  position:fixed; inset:0; z-index:9999; background:var(--dark-bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+#loading.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+.loading-pulse { width:48px; height:48px; border-radius:50%; background:var(--blue-accent); animation:loadPulse 1.2s ease-in-out infinite; margin-bottom:24px; }
+@keyframes loadPulse { 0%,100%{transform:scale(0.8);opacity:0.5;} 50%{transform:scale(1.1);opacity:1;} }
+.loading-text { font-size:0.85rem; color:var(--text-muted); letter-spacing:0.12em; text-transform:uppercase; }
+
+/* Map */
+#map { position:absolute; inset:0; }
+.maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { display:none; }
+.maplibregl-popup-content { background:rgba(255,255,255,0.95) !important; backdrop-filter:blur(16px); border:1px solid rgba(0,0,0,0.08); border-radius:12px !important; padding:0 !important; box-shadow:0 8px 32px rgba(0,0,0,0.15) !important; color:#333; }
+.maplibregl-popup-tip { border-top-color:rgba(255,255,255,0.95) !important; }
+.maplibregl-popup-close-button { color:var(--text-muted); font-size:18px; padding:8px 10px; }
+.maplibregl-popup-close-button:hover { color:var(--text-primary); background:transparent; }
+
+/* Header */
+.hud-header {
+  position:fixed; top:0; left:0; right:0; z-index:100; height:64px;
+  background:var(--glass); backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--glass-border);
+  display:flex; align-items:center; justify-content:space-between; padding:0 24px;
+}
+.hud-logo { display:flex; align-items:center; gap:12px; }
+.logo-dot { width:10px; height:10px; border-radius:50%; background:var(--blue-accent); box-shadow:0 0 12px var(--blue-glow),0 0 24px var(--blue-glow); animation:logoPulse 2s ease-in-out infinite; }
+@keyframes logoPulse { 0%,100%{box-shadow:0 0 8px var(--blue-glow);} 50%{box-shadow:0 0 16px var(--blue-glow),0 0 32px var(--blue-glow);} }
+.logo-label { font-size:0.72rem; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-secondary); }
+.logo-name { font-size:1rem; font-weight:700; color:var(--text-primary); margin-top:1px; }
+.hud-views { display:flex; gap:4px; background:rgba(255,255,255,0.05); border-radius:10px; padding:3px; }
+.view-btn { background:transparent; border:none; color:var(--text-muted); padding:8px 16px; border-radius:8px; font-size:0.82rem; font-weight:600; cursor:pointer; transition:var(--transition); white-space:nowrap; font-family:inherit; }
+.view-btn:hover { color:var(--text-secondary); background:rgba(255,255,255,0.05); }
+.view-btn.active { color:var(--text-primary); background:rgba(0,153,255,0.2); box-shadow:0 0 12px rgba(0,153,255,0.15); }
+.hud-badge { display:flex; gap:16px; font-size:0.78rem; color:var(--text-muted); font-weight:500; }
+.hud-badge span { white-space:nowrap; }
+.hud-badge strong { color:var(--text-secondary); font-weight:700; }
+
+/* Sidebar */
+.hud-sidebar {
+  position:fixed; top:80px; left:20px; z-index:90; width:290px;
+  background:var(--glass); backdrop-filter:blur(24px);
+  border:1px solid var(--glass-border); border-radius:var(--radius);
+  padding:20px; max-height:calc(100vh - 170px); overflow-y:auto;
+}
+.sidebar-title { font-size:0.68rem; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-muted); margin-bottom:16px; }
+.sidebar-section { margin-bottom:16px; }
+.sidebar-section-title { font-size:0.7rem; font-weight:600; color:var(--text-secondary); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.08em; }
+
+/* Search */
+.search-wrapper { position:relative; margin-bottom:16px; }
+.search-box { width:100%; padding:9px 32px 9px 34px; border-radius:var(--radius-sm); border:1px solid var(--glass-border); background:rgba(255,255,255,0.04); color:var(--text-primary); font-size:0.85rem; font-family:inherit; outline:none; transition:var(--transition); }
+.search-box:focus { border-color:var(--blue-accent); background:rgba(255,255,255,0.06); }
+.search-box::placeholder { color:var(--text-muted); }
+.search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:0.85rem; color:var(--text-secondary); pointer-events:none; line-height:1; }
+.search-clear { position:absolute; right:8px; top:50%; transform:translateY(-50%); width:20px; height:20px; border-radius:50%; border:none; background:rgba(255,255,255,0.08); color:var(--text-muted); font-size:0.7rem; cursor:pointer; display:none; align-items:center; justify-content:center; font-family:inherit; transition:var(--transition); line-height:1; padding:0; }
+.search-clear:hover { background:rgba(255,255,255,0.15); color:var(--text-primary); }
+.search-clear.visible { display:flex; }
+
+/* Reset button */
+.reset-btn { width:100%; padding:8px; border-radius:var(--radius-sm); border:1px solid var(--glass-border); background:transparent; color:var(--text-muted); font-size:0.78rem; font-weight:500; cursor:pointer; transition:var(--transition); font-family:inherit; margin-top:8px; }
+.reset-btn:hover { border-color:var(--glass-border-hover); color:var(--text-secondary); background:rgba(255,255,255,0.03); }
+
+/* Toggles */
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; cursor:pointer; }
+.toggle-row:hover .toggle-label { color:var(--text-primary); }
+.toggle-label { font-size:0.82rem; color:var(--text-secondary); transition:var(--transition); }
+.toggle-switch { width:36px; height:20px; border-radius:10px; background:rgba(255,255,255,0.1); position:relative; transition:var(--transition); flex-shrink:0; }
+.toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#555; transition:var(--transition); }
+.toggle-row.active .toggle-switch { background:var(--blue-accent); }
+.toggle-row.active .toggle-switch::after { left:18px; background:white; }
+
+/* Domain/sector filter chips */
+.filter-chips { display:flex; flex-wrap:wrap; gap:4px; }
+.filter-chip {
+  display:flex; align-items:center; gap:4px;
+  padding:4px 8px; border-radius:14px;
+  border:1px solid var(--glass-border); background:transparent;
+  color:var(--text-muted); font-size:0.68rem; font-weight:500;
+  cursor:pointer; transition:var(--transition); font-family:inherit;
+}
+.filter-chip:hover { border-color:var(--glass-border-hover); color:var(--text-secondary); }
+.filter-chip.active { border-color:currentColor; }
+.chip-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+.sector-chips { display:flex; gap:4px; flex-wrap:wrap; }
+.sector-chip {
+  width:28px; height:28px; border-radius:6px;
+  border:1px solid var(--glass-border); background:transparent;
+  color:var(--text-muted); font-size:0.72rem; font-weight:700;
+  cursor:pointer; transition:var(--transition); font-family:inherit;
+  display:flex; align-items:center; justify-content:center;
+}
+.sector-chip:hover { border-color:var(--glass-border-hover); }
+.sector-chip.active { background:rgba(0,153,255,0.15); border-color:var(--blue-accent); color:var(--blue-accent); }
+
+.sidebar-counter { text-align:center; padding:10px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.03); border:1px solid var(--glass-border); font-size:0.8rem; color:var(--text-muted); margin-top:12px; }
+.sidebar-counter strong { color:var(--blue-accent); font-size:1.05rem; }
+
+/* Edit mode */
+.edit-toggle { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--glass-border); background:transparent; cursor:pointer; transition:var(--transition); margin-bottom:12px; width:100%; font-family:inherit; color:var(--text-secondary); font-size:0.82rem; font-weight:500; }
+.edit-toggle:hover { border-color:var(--glass-border-hover); }
+.edit-toggle.active { border-color:#e67e22; background:rgba(230,126,34,0.1); color:#e67e22; }
+.edit-toggle .edit-icon { font-size:1rem; }
+.edit-badge { font-size:0.6rem; padding:2px 6px; border-radius:8px; background:rgba(255,255,255,0.08); color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.05em; }
+.edit-toggle.active .edit-badge { background:rgba(230,126,34,0.2); color:#e67e22; }
+.toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%) translateY(20px); z-index:200; background:var(--glass); backdrop-filter:blur(16px); border:1px solid var(--glass-border); border-radius:10px; padding:10px 20px; font-size:0.82rem; color:var(--text-primary); opacity:0; transition:all 0.3s ease; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.export-btn { width:100%; padding:8px; border-radius:var(--radius-sm); border:1px solid var(--glass-border); background:transparent; color:var(--text-muted); font-size:0.75rem; font-weight:500; cursor:pointer; transition:var(--transition); font-family:inherit; margin-top:6px; display:none; }
+.export-btn:hover { border-color:var(--glass-border-hover); color:var(--text-secondary); }
+.export-btn.visible { display:block; }
+
+/* Add company modal */
+.modal-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal {
+  background:var(--glass); backdrop-filter:blur(24px); border:1px solid var(--glass-border);
+  border-radius:var(--radius); width:380px; max-width:calc(100vw - 40px);
+  max-height:calc(100vh - 80px); overflow-y:auto; padding:24px;
+  animation: modalIn 0.3s ease;
+}
+@keyframes modalIn { from { opacity:0; transform:translateY(20px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+.modal-title { font-size:1.1rem; font-weight:700; margin-bottom:4px; }
+.modal-subtitle { font-size:0.75rem; color:var(--text-muted); margin-bottom:16px; }
+.modal-field { margin-bottom:12px; }
+.modal-label { display:block; font-size:0.7rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px; }
+.modal-input, .modal-select {
+  width:100%; padding:8px 12px; border-radius:var(--radius-sm);
+  border:1px solid var(--glass-border); background:rgba(255,255,255,0.04);
+  color:var(--text-primary); font-size:0.85rem; font-family:inherit; outline:none;
+  transition:var(--transition);
+}
+.modal-input:focus, .modal-select:focus { border-color:var(--blue-accent); background:rgba(255,255,255,0.07); }
+.modal-input::placeholder { color:var(--text-muted); }
+.modal-select option { background:#1a2030; color:white; }
+.modal-coords { display:flex; gap:8px; }
+.modal-coords .modal-field { flex:1; }
+.modal-actions { display:flex; gap:8px; margin-top:16px; }
+.modal-btn { flex:1; padding:10px; border-radius:var(--radius-sm); font-size:0.85rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:inherit; border:none; }
+.modal-btn-primary { background:linear-gradient(135deg,var(--blue-primary),var(--blue-accent)); color:white; }
+.modal-btn-primary:hover { filter:brightness(1.15); }
+.modal-btn-cancel { background:transparent; border:1px solid var(--glass-border) !important; color:var(--text-secondary); }
+.modal-btn-cancel:hover { border-color:var(--glass-border-hover) !important; color:var(--text-primary); }
+.modal-building-preview { padding:8px 12px; border-radius:var(--radius-sm); background:rgba(0,153,255,0.08); border:1px solid rgba(0,153,255,0.15); font-size:0.78rem; color:var(--blue-accent); margin-bottom:16px; }
+.modal-building-preview strong { color:var(--text-primary); }
+
+/* Detail panel */
+.hud-detail {
+  position:fixed; top:80px; right:20px; z-index:90; width:340px;
+  background:var(--glass); backdrop-filter:blur(24px);
+  border:1px solid var(--glass-border); border-radius:var(--radius);
+  transform:translateX(calc(100% + 40px));
+  transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);
+  overflow:hidden; max-height:calc(100vh - 170px); overflow-y:auto;
+}
+.hud-detail.open { transform:translateX(0); }
+.detail-bar { height:4px; width:100%; }
+.detail-header { padding:20px 20px 0; display:flex; justify-content:space-between; align-items:flex-start; }
+.detail-name { font-size:1.15rem; font-weight:700; line-height:1.3; flex:1; margin-right:12px; }
+.detail-close { width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,0.06); border:none; color:var(--text-muted); font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:var(--transition); flex-shrink:0; font-family:inherit; }
+.detail-close:hover { background:rgba(255,255,255,0.12); color:var(--text-primary); }
+.detail-badges { padding:10px 20px 0; display:flex; gap:6px; flex-wrap:wrap; }
+.detail-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:14px; font-size:0.7rem; font-weight:600; border:1px solid; }
+.detail-body { padding:14px 20px 20px; }
+.detail-row { display:flex; align-items:flex-start; gap:8px; padding:6px 0; border-bottom:1px solid var(--glass-border); }
+.detail-row:last-child { border-bottom:none; }
+.detail-row-icon { font-size:0.85rem; width:20px; text-align:center; flex-shrink:0; padding-top:1px; }
+.detail-row-content { flex:1; }
+.detail-row-label { font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
+.detail-row-value { font-size:0.85rem; color:var(--text-primary); margin-top:1px; word-break:break-word; }
+.detail-row-value a { color:var(--blue-accent); text-decoration:none; }
+.detail-row-value a:hover { text-decoration:underline; }
+.detail-flags { display:flex; gap:6px; padding:10px 0; }
+.detail-flag { padding:3px 8px; border-radius:10px; font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; }
+.detail-flag.on { background:rgba(0,204,136,0.12); color:var(--green-dispo); border:1px solid rgba(0,204,136,0.2); }
+.detail-flag.off { background:rgba(255,255,255,0.03); color:var(--text-muted); border:1px solid var(--glass-border); }
+.detail-cta { display:block; width:100%; padding:11px; border-radius:var(--radius-sm); background:linear-gradient(135deg,var(--blue-primary),var(--blue-accent)); color:white; border:none; font-size:0.85rem; font-weight:600; cursor:pointer; transition:var(--transition); font-family:inherit; text-align:center; margin-top:12px; }
+.detail-cta:hover { filter:brightness(1.15); transform:translateY(-1px); box-shadow:0 4px 20px rgba(0,102,204,0.3); }
+
+/* Stats bar */
+.hud-stats {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:90;
+  background:var(--glass); backdrop-filter:blur(24px);
+  border:1px solid var(--glass-border); border-radius:40px;
+  padding:12px 32px; display:flex; gap:28px; align-items:center;
+}
+.stat-item { text-align:center; white-space:nowrap; }
+.stat-value { font-size:1.15rem; font-weight:800; color:var(--text-primary); }
+.stat-unit { font-size:0.68rem; color:var(--text-muted); margin-top:1px; }
+.stat-divider { width:1px; height:28px; background:var(--glass-border); }
+
+/* Port site markers */
+.port-marker { position:relative; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.marker-ring { position:absolute; width:40px; height:40px; border-radius:50%; border:2px solid var(--blue-accent); opacity:0.4; animation:markerPulse 2.5s ease-out infinite; }
+@keyframes markerPulse { 0%{transform:scale(0.8);opacity:0.5;} 100%{transform:scale(2);opacity:0;} }
+.marker-core { width:14px; height:14px; border-radius:50%; background:var(--blue-accent); box-shadow:0 0 10px var(--blue-accent); transition:var(--transition); position:relative; z-index:1; }
+.port-marker:hover .marker-core { transform:scale(1.3); }
+.marker-tooltip { position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); background:var(--glass); backdrop-filter:blur(12px); border:1px solid var(--glass-border); border-radius:6px; padding:5px 10px; white-space:nowrap; font-size:0.72rem; font-weight:600; color:var(--text-primary); opacity:0; transition:var(--transition); pointer-events:none; }
+.port-marker:hover .marker-tooltip { opacity:1; transform:translateX(-50%) translateY(-4px); }
+
+/* Responsive */
+@media (max-width:900px) {
+  .hud-header { padding:0 12px; }
+  .hud-badge { display:none; }
+  .hud-sidebar { width:260px; left:12px; top:74px; }
+  .hud-detail { width:300px; right:12px; top:74px; }
+  .hud-stats { padding:10px 20px; gap:16px; }
+  .stat-value { font-size:0.95rem; }
+  .view-btn { padding:6px 10px; font-size:0.75rem; }
+}
+@media (max-width:640px) {
+  .hud-sidebar { left:0; right:0; top:auto; bottom:0; width:100%; border-radius:var(--radius) var(--radius) 0 0; max-height:50vh; transform:translateY(calc(100% - 48px)); transition:transform 0.35s cubic-bezier(0.16,1,0.3,1); }
+  .hud-sidebar.expanded { transform:translateY(0); }
+  .sidebar-pull { display:flex !important; justify-content:center; padding:8px 0 4px; cursor:pointer; }
+  .sidebar-pull-bar { width:32px; height:4px; border-radius:2px; background:rgba(255,255,255,0.2); }
+  .hud-detail { width:calc(100% - 24px); right:12px; }
+  .hud-stats { width:calc(100% - 24px); border-radius:16px; bottom:12px; }
+  .logo-name { font-size:0.85rem; }
+}
+.sidebar-pull { display:none; }
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="loading-pulse"></div><div class="loading-text">Chargement de la carte</div></div>
+<div id="map"></div>
+
+<header class="hud-header">
+  <div class="hud-logo">
+    <div class="logo-dot"></div>
+    <div>
+      <div class="logo-label">Port Autonome de Strasbourg</div>
+      <div class="logo-name">Plateforme Cartographique</div>
+    </div>
+  </div>
+  <div class="hud-views">
+    <button class="view-btn active" data-view="3d">&#x1f3d9; Carte 3D</button>
+    <button class="view-btn" data-view="satellite">&#x1f6f0; Satellite IGN</button>
+  </div>
+  <div class="hud-badge">
+    <span><strong>280</strong> entreprises</span>
+    <span><strong>9</strong> secteurs</span>
+    <span><strong>1 400</strong> ha</span>
+  </div>
+</header>
+
+<aside class="hud-sidebar" id="sidebar">
+  <div class="sidebar-pull" id="sidebarPull"><div class="sidebar-pull-bar"></div></div>
+  <div class="sidebar-title">Explorer le territoire</div>
+
+  <div class="search-wrapper">
+    <span class="search-icon">&#x1f50e;</span>
+    <input type="text" class="search-box" id="searchBox" placeholder="Rechercher une entreprise...">
+    <button class="search-clear" id="searchClear">&times;</button>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Couches</div>
+    <div class="toggle-row active" data-layer="entreprises"><span class="toggle-label">Entreprises (280)</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row" data-layer="services"><span class="toggle-label">Services (35)</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row" data-layer="secteurs"><span class="toggle-label">Zones secteurs</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row active" data-layer="infra"><span class="toggle-label">Infrastructure</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row active" data-layer="buildings"><span class="toggle-label">Batiments 3D</span><div class="toggle-switch"></div></div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Activite</div>
+    <div class="filter-chips" id="domainFilters"></div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Secteur portuaire</div>
+    <div class="sector-chips" id="sectorFilters"></div>
+  </div>
+
+  <button class="edit-toggle" id="editToggle">
+    <span><span class="edit-icon">&#x270f;</span> Mode edition</span>
+    <span class="edit-badge">OFF</span>
+  </button>
+  <button class="export-btn" id="exportBtn">&#x1f4cb; Exporter les modifications</button>
+
+  <button class="reset-btn" id="resetFilters">&#x21bb; Reinitialiser tous les filtres</button>
+
+  <div class="sidebar-counter" id="sidebarCounter"><strong>280</strong> entreprises visibles</div>
+</aside>
+
+<div class="hud-detail" id="detailPanel">
+  <div class="detail-bar" id="detailBar"></div>
+  <div class="detail-header">
+    <div class="detail-name" id="detailName"></div>
+    <button class="detail-close" id="detailClose">&times;</button>
+  </div>
+  <div class="detail-badges" id="detailBadges"></div>
+  <div class="detail-body" id="detailBody"></div>
+</div>
+
+<div class="hud-stats">
+  <div class="stat-item"><div class="stat-value" id="stat1">0</div><div class="stat-unit">entreprises</div></div>
+  <div class="stat-divider"></div>
+  <div class="stat-item"><div class="stat-value" id="stat2">0</div><div class="stat-unit">secteurs</div></div>
+  <div class="stat-divider"></div>
+  <div class="stat-item"><div class="stat-value" id="stat3">0</div><div class="stat-unit">services</div></div>
+  <div class="stat-divider"></div>
+  <div class="stat-item"><div class="stat-value" id="stat4">0</div><div class="stat-unit">port fluvial FR</div></div>
+</div>
+
+<!-- Modal ajout entreprise -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">Nouvelle entreprise</div>
+    <div class="modal-subtitle">Associer une entreprise a ce batiment</div>
+    <div class="modal-building-preview" id="modalBuildingInfo"></div>
+    <div class="modal-field">
+      <label class="modal-label">Nom de l'entreprise *</label>
+      <input class="modal-input" id="modalNom" placeholder="Ex: Logistics Rhine SAS">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Secteur d'activite *</label>
+      <select class="modal-select" id="modalDomaine"></select>
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Adresse</label>
+      <input class="modal-input" id="modalAdresse" placeholder="12 rue du Port">
+    </div>
+    <div class="modal-coords">
+      <div class="modal-field">
+        <label class="modal-label">Ville</label>
+        <input class="modal-input" id="modalVille" placeholder="Strasbourg">
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Code postal</label>
+        <input class="modal-input" id="modalCP" placeholder="67000">
+      </div>
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Telephone</label>
+      <input class="modal-input" id="modalTel" placeholder="03 88 XX XX XX">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Email</label>
+      <input class="modal-input" id="modalEmail" placeholder="contact@entreprise.fr">
+    </div>
+    <div class="modal-field">
+      <label class="modal-label">Site web</label>
+      <input class="modal-input" id="modalWebsite" placeholder="https://www.entreprise.fr">
+    </div>
+    <div class="modal-coords" id="modalCoordsDisplay">
+      <div class="modal-field">
+        <label class="modal-label">Latitude</label>
+        <input class="modal-input" id="modalLat" readonly>
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">Longitude</label>
+        <input class="modal-input" id="modalLng" readonly>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn modal-btn-cancel" id="modalCancel">Annuler</button>
+      <button class="modal-btn modal-btn-primary" id="modalSave">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="data.js"></script>
+<script src="matched-buildings.js"></script>
+<script>
+// ══════════════════════════════════════════
+// DOMAIN CONFIG
+// ══════════════════════════════════════════
+var domainConfig = {
+  'TRANSPORTS ET LOGISTIQUE':                         {short:'Transport',   color:'#0099FF'},
+  'INDUSTRIE Agroalimentaire':                        {short:'Agro',        color:'#00CC88'},
+  'INDUSTRIE Automobile':                             {short:'Auto',        color:'#CC7700'},
+  'INDUSTRIE Chimie':                                 {short:'Chimie',      color:'#CC3366'},
+  'INDUSTRIE M\u00e9tallurgie':                       {short:'Metal',       color:'#6699CC'},
+  'INDUSTRIE Papier':                                 {short:'Papier',      color:'#88BB44'},
+  'MATERIAUX DE CONSTRUCTION / BTP':                  {short:'BTP',         color:'#CC8800'},
+  'SERVICES Divers':                                  {short:'Services',    color:'#8866CC'},
+  'SERVICES Data centers':                            {short:'Data',        color:'#00BBBB'},
+  'SERVICES Services portuaires':                     {short:'Portuaire',   color:'#0066AA'},
+  'ENERGIE Production':                               {short:'Energie',     color:'#BBBB00'},
+  'ENERGIE Stockage hydrocarbures':                   {short:'Hydrocarbures',color:'#CC4400'},
+  'VALORISATION DECHETS':                             {short:'D\u00e9chets',color:'#44BB66'},
+  'CROISIERES et NAUTISME':                           {short:'Nautisme',    color:'#3399FF'},
+  "ADMINISTRATIONS et ORGANISMES D'INTERET GENERAL":  {short:'Admin',       color:'#888899'}
+};
+
+var sectorColorMap = {A:'#FF6B6B',B:'#4ECDC4',C:'#45B7D1',D:'#96CEB4',E:'#F7DC6F',F:'#DDA0DD',G:'#98D8C8',H:'#E8A87C',I:'#BB8FCE'};
+
+// Build MapLibre match expression for circle colors
+var colorMatch = ['match',['get','domaine']];
+Object.entries(domainConfig).forEach(function(e){ colorMatch.push(e[0], e[1].color); });
+colorMatch.push('#666666');
+
+// ══════════════════════════════════════════
+// COMPANY POINTS → 3D BUILDING POLYGONS
+// ══════════════════════════════════════════
+var heightByDomain = {
+  'TRANSPORTS ET LOGISTIQUE':12, 'INDUSTRIE Agroalimentaire':18,
+  'INDUSTRIE Automobile':16, 'INDUSTRIE Chimie':20,
+  'INDUSTRIE M\u00e9tallurgie':15, 'INDUSTRIE Papier':14,
+  'MATERIAUX DE CONSTRUCTION / BTP':10, 'SERVICES Divers':14,
+  'SERVICES Data centers':12, 'SERVICES Services portuaires':8,
+  'ENERGIE Production':22, 'ENERGIE Stockage hydrocarbures':25,
+  'VALORISATION DECHETS':10, 'CROISIERES et NAUTISME':8,
+  "ADMINISTRATIONS et ORGANISMES D'INTERET GENERAL":15
+};
+
+function pointsToBuildings(geojson) {
+  return {type:'FeatureCollection', features: geojson.features.map(function(f){
+    var lng = f.geometry.coordinates[0], lat = f.geometry.coordinates[1];
+    var d = f.properties.domaine || '';
+    var w, h;
+    if (d.indexOf('INDUSTRIE')===0||d.indexOf('MATERIAUX')===0) { w=0.00022; h=0.00015; }
+    else if (d==='TRANSPORTS ET LOGISTIQUE') { w=0.00030; h=0.00012; }
+    else if (d.indexOf('ENERGIE')===0) { w=0.00018; h=0.00018; }
+    else if (d.indexOf('VALORISATION')===0) { w=0.00024; h=0.00014; }
+    else { w=0.00016; h=0.00012; }
+    var bh = heightByDomain[d] || 12;
+    var p = Object.assign({}, f.properties, {_height: bh});
+    return {type:'Feature', geometry:{type:'Polygon', coordinates:[[[lng-w,lat-h],[lng+w,lat-h],[lng+w,lat+h],[lng-w,lat+h],[lng-w,lat-h]]]}, properties:p};
+  })};
+}
+
+// Get company buildings data (pre-computed IGN + any new additions)
+function rebuildCompanyBuildings() {
+  var base = (typeof matchedBuildingsGeoJSON !== 'undefined') ? matchedBuildingsGeoJSON : {type:'FeatureCollection',features:[]};
+  // Add new companies (added via edit mode) that aren't in pre-computed data
+  var precomputedIds = {};
+  base.features.forEach(function(f){ precomputedIds[f.properties.id] = true; });
+  var newCompanies = companiesGeoJSON.features.filter(function(f){ return f.properties._new && !precomputedIds[f.properties.id]; });
+  if (newCompanies.length === 0) return base;
+  // New companies get small building polygons
+  var extras = pointsToBuildings({type:'FeatureCollection',features:newCompanies});
+  return {type:'FeatureCollection', features: base.features.concat(extras.features)};
+}
+
+// ══════════════════════════════════════════
+// PORT INFRASTRUCTURE (key sites)
+// ══════════════════════════════════════════
+var portSites = [
+  {nom:'Terminal Sud Multimodal', coords:[7.762,48.527], desc:'Hub conteneurs, rail et fluvial'},
+  {nom:'Port Nord Strasbourg',   coords:[7.803,48.618], desc:'Logistique urbaine et distribution'},
+  {nom:'Port de Reichstett',     coords:[7.784,48.661], desc:'Petrochimie et stockage'},
+  {nom:'Port de Drusenheim',     coords:[7.958,48.752], desc:'Vrac et logistique'},
+  {nom:'Port de Lauterbourg',    coords:[8.178,48.973], desc:'Terminal frontalier multimodal'},
+  {nom:'Port de Marckolsheim',   coords:[7.546,48.083], desc:'Cereales et agro-industrie'},
+  {nom:'Port de Plobsheim',      coords:[7.739,48.438], desc:'Industrie lourde'},
+  {nom:'Port de Rhinau',         coords:[7.712,48.317], desc:'Zone de developpement'},
+  {nom:'Port de Seltz',          coords:[8.064,48.897], desc:'Vrac solide'}
+];
+
+var rhineCoords = [[7.53,48.05],[7.54,48.10],[7.546,48.083],[7.56,48.15],[7.60,48.20],[7.65,48.27],[7.70,48.32],[7.71,48.37],[7.73,48.42],[7.74,48.46],[7.76,48.50],[7.77,48.55],[7.78,48.58],[7.79,48.61],[7.79,48.64],[7.80,48.68],[7.82,48.71],[7.85,48.74],[7.90,48.78],[7.95,48.82],[8.00,48.86],[8.04,48.89],[8.08,48.92],[8.12,48.95],[8.18,48.98]];
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+var showLayers = {entreprises:true,services:false,secteurs:false,infra:true,buildings:true};
+var activeDomains = new Set(Object.keys(domainConfig));
+var activeSectors = new Set(['A','B','C','D','E','F','G','H','I']);
+var searchQuery = '';
+var infraMarkers = [];
+
+// ══════════════════════════════════════════
+// MAP STYLE
+// ══════════════════════════════════════════
+var mapStyle = {
+  version:8, name:'PAS',
+  glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+  sources:{
+    'ign-plan':{type:'raster',tiles:['https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}'],tileSize:256,maxzoom:19,attribution:'\u00a9 IGN'},
+    'ign-ortho':{type:'raster',tiles:['https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}'],tileSize:256,maxzoom:20,attribution:'\u00a9 IGN'},
+    'terrain-dem':{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],encoding:'terrarium',tileSize:256,maxzoom:15},
+    'ign-vector':{type:'vector',tiles:['https://data.geopf.fr/tms/1.0.0/PLAN.IGN/{z}/{x}/{y}.pbf'],maxzoom:19,attribution:'\u00a9 IGN BD TOPO'},
+    openmaptiles:{type:'vector',tiles:['https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf'],maxzoom:14},
+    satellite:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19}
+  },
+  terrain:{source:'terrain-dem',exaggeration:1.5},
+  layers:[
+    {id:'background',type:'background',paint:{'background-color':'#f5f3f0'}},
+    {id:'ign-plan-layer',type:'raster',source:'ign-plan',paint:{'raster-opacity':1}},
+    {id:'ign-ortho-layer',type:'raster',source:'ign-ortho',layout:{visibility:'none'},paint:{'raster-opacity':1}},
+    {id:'satellite-layer',type:'raster',source:'satellite',layout:{visibility:'none'},paint:{'raster-opacity':1}},
+    {id:'landcover',type:'fill',source:'openmaptiles','source-layer':'landcover',paint:{'fill-color':'#e8f0e0','fill-opacity':0.4}},
+    {id:'landuse-residential',type:'fill',source:'openmaptiles','source-layer':'landuse',filter:['==','class','residential'],paint:{'fill-color':'#f0ebe5','fill-opacity':0.5}},
+    {id:'landuse-industrial',type:'fill',source:'openmaptiles','source-layer':'landuse',filter:['any',['==','class','industrial'],['==','class','commercial']],paint:{'fill-color':'#eae4ea','fill-opacity':0.5}},
+    {id:'landuse-park',type:'fill',source:'openmaptiles','source-layer':'landuse',filter:['any',['==','class','park'],['==','class','grass']],paint:{'fill-color':'#d0e8c8','fill-opacity':0.6}},
+    {id:'water',type:'fill',source:'openmaptiles','source-layer':'water',paint:{'fill-color':'#b0d0ee'}},
+    {id:'waterway',type:'line',source:'openmaptiles','source-layer':'waterway',paint:{'line-color':'#a0c4e0','line-width':['interpolate',['linear'],['zoom'],8,0.5,14,3]}},
+    {id:'road-minor',type:'line',source:'openmaptiles','source-layer':'transportation',filter:['any',['==','class','minor'],['==','class','service']],minzoom:12,paint:{'line-color':'#ffffff','line-width':1}},
+    {id:'road-secondary',type:'line',source:'openmaptiles','source-layer':'transportation',filter:['any',['==','class','secondary'],['==','class','tertiary']],paint:{'line-color':'#ffffff','line-width':['interpolate',['linear'],['zoom'],8,0.8,14,2.5]}},
+    {id:'road-primary',type:'line',source:'openmaptiles','source-layer':'transportation',filter:['==','class','primary'],paint:{'line-color':'#fcd6a4','line-width':['interpolate',['linear'],['zoom'],6,0.8,14,3.5]}},
+    {id:'road-trunk',type:'line',source:'openmaptiles','source-layer':'transportation',filter:['any',['==','class','trunk'],['==','class','motorway']],paint:{'line-color':'#f8c080','line-width':['interpolate',['linear'],['zoom'],5,1,14,5]}},
+    {id:'railway',type:'line',source:'openmaptiles','source-layer':'transportation',filter:['==','class','rail'],paint:{'line-color':'#c0b0c8','line-width':1,'line-dasharray':[4,3]}},
+    {id:'boundary',type:'line',source:'openmaptiles','source-layer':'boundary',filter:['==','admin_level',2],paint:{'line-color':'#b0a0c0','line-width':1.5,'line-dasharray':[6,3]}},
+    {id:'buildings-flat',type:'fill',source:'ign-vector','source-layer':'bati_surf',minzoom:13,paint:{'fill-color':'#d0c8c0','fill-opacity':0.6}},
+    {id:'buildings-3d',type:'fill-extrusion',source:'ign-vector','source-layer':'bati_surf',minzoom:13,paint:{'fill-extrusion-color':['interpolate',['linear'],['coalesce',['get','hauteur'],5],0,'#d5cec5',10,'#c8beb5',20,'#b8aaa0',40,'#a09080'],'fill-extrusion-height':['interpolate',['linear'],['zoom'],13,0,14.5,['coalesce',['get','hauteur'],5]],'fill-extrusion-base':0,'fill-extrusion-opacity':0.8}},
+    {id:'place-town',type:'symbol',source:'openmaptiles','source-layer':'place',filter:['==','class','town'],minzoom:8,layout:{'text-field':['get','name'],'text-font':['Open Sans Regular'],'text-size':11,'text-padding':10},paint:{'text-color':'#555555','text-halo-color':'#ffffff','text-halo-width':2}},
+    {id:'place-city',type:'symbol',source:'openmaptiles','source-layer':'place',filter:['==','class','city'],layout:{'text-field':['get','name'],'text-font':['Open Sans Bold'],'text-size':['interpolate',['linear'],['zoom'],6,12,12,20],'text-padding':12},paint:{'text-color':'#333333','text-halo-color':'#ffffff','text-halo-width':2.5}}
+  ]
+};
+
+// ══════════════════════════════════════════
+// MAP INIT
+// ══════════════════════════════════════════
+// Mark matched companies so we can hide their circles at high zoom
+if (typeof matchedCompanyIds !== 'undefined') {
+  companiesGeoJSON.features.forEach(function(f){
+    f.properties._matched = matchedCompanyIds.has(f.properties.id);
+  });
+}
+
+// Cache for rebuilt buildings
+var _buildingsCache = null;
+var _buildingsCacheDirty = true;
+var _origRebuild = rebuildCompanyBuildings;
+rebuildCompanyBuildings = function() {
+  if (!_buildingsCacheDirty && _buildingsCache) return _buildingsCache;
+  _buildingsCache = _origRebuild();
+  _buildingsCacheDirty = false;
+  return _buildingsCache;
+};
+function invalidateBuildingsCache() { _buildingsCacheDirty = true; }
+
+var map = new maplibregl.Map({container:'map',style:mapStyle,center:[7.78,48.56],zoom:9,pitch:45,bearing:-15,antialias:true,maxPitch:70});
+map.addControl(new maplibregl.NavigationControl({showCompass:true,showZoom:true,visualizePitch:true}),'top-right');
+
+map.on('load', function() {
+  // Rhine glow
+  map.addSource('rhine',{type:'geojson',data:{type:'Feature',geometry:{type:'LineString',coordinates:rhineCoords}}});
+  map.addLayer({id:'rhine-glow',type:'line',source:'rhine',paint:{'line-color':'#0066CC','line-width':14,'line-opacity':0.12,'line-blur':10}});
+  map.addLayer({id:'rhine-core',type:'line',source:'rhine',paint:{'line-color':'#0077DD','line-width':2.5,'line-opacity':0.5}});
+
+  // Sector polygons
+  map.addSource('sectors',{type:'geojson',data:sectorsGeoJSON});
+  var sectorMatch = ['match',['get','secteur']];
+  Object.entries(sectorColorMap).forEach(function(e){sectorMatch.push(e[0],e[1]);});
+  sectorMatch.push('#333');
+  map.addLayer({id:'sectors-fill',type:'fill',source:'sectors',layout:{visibility:'none'},paint:{'fill-color':sectorMatch,'fill-opacity':0.12}});
+  map.addLayer({id:'sectors-outline',type:'line',source:'sectors',layout:{visibility:'none'},paint:{'line-color':sectorMatch,'line-width':1.5,'line-opacity':0.4}});
+  map.addLayer({id:'sectors-labels',type:'symbol',source:'sectors',layout:{visibility:'none','text-field':['concat','Secteur ',['get','secteur']],'text-font':['Open Sans Bold'],'text-size':14},paint:{'text-color':'rgba(0,0,0,0.5)','text-halo-color':'#ffffff','text-halo-width':2}});
+
+  // Companies — point source
+  map.addSource('companies',{type:'geojson',data:companiesGeoJSON});
+
+  // Circles — LOW ZOOM (all companies)
+  map.addLayer({id:'companies-circles',type:'circle',source:'companies',maxzoom:14,paint:{
+    'circle-radius':['interpolate',['linear'],['zoom'],8,3,12,6,13.5,4],
+    'circle-color':colorMatch,'circle-opacity':0.85,
+    'circle-stroke-width':1,'circle-stroke-color':'rgba(255,255,255,0.3)'
+  }});
+
+  // Circles — HIGH ZOOM (only UNMATCHED companies, as small ground dots)
+  map.addLayer({id:'companies-circles-hi',type:'circle',source:'companies',minzoom:14,
+    filter:['!=',['get','_matched'],true],
+    paint:{
+      'circle-radius':['interpolate',['linear'],['zoom'],14,4,17,6],
+      'circle-color':colorMatch,'circle-opacity':0.9,
+      'circle-stroke-width':2,'circle-stroke-color':'rgba(255,255,255,0.5)'
+    }
+  });
+
+  // Companies — 3D buildings (pre-computed from IGN BD TOPO)
+  map.addSource('company-buildings',{type:'geojson',data:rebuildCompanyBuildings()});
+  map.addLayer({id:'company-buildings-3d',type:'fill-extrusion',source:'company-buildings',minzoom:13,paint:{
+    'fill-extrusion-color':colorMatch,
+    'fill-extrusion-height':['coalesce',['get','_height'],10],
+    'fill-extrusion-base':0,
+    'fill-extrusion-opacity':0.92
+  }});
+  map.addLayer({id:'company-buildings-outline',type:'line',source:'company-buildings',minzoom:14,paint:{
+    'line-color':['case',['>=',['coalesce',['get','_occupants'],1],2],'#FFD700',colorMatch],
+    'line-width':['case',['>=',['coalesce',['get','_occupants'],1],2],3,1.5],
+    'line-opacity':['case',['>=',['coalesce',['get','_occupants'],1],2],0.9,0.6]
+  }});
+  map.addLayer({id:'companies-labels',type:'symbol',source:'companies',minzoom:15,layout:{'text-field':['get','nom'],'text-font':['Open Sans Regular'],'text-size':10,'text-offset':[0,0],'text-anchor':'center','text-max-width':10,'text-allow-overlap':false},paint:{'text-color':'#ffffff','text-halo-color':'rgba(0,0,0,0.7)','text-halo-width':1.5}});
+
+  // Services
+  map.addSource('services',{type:'geojson',data:servicesGeoJSON});
+  map.addLayer({id:'services-circles',type:'circle',source:'services',layout:{visibility:'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],8,3,12,5,15,8],'circle-color':'#FF6B9D','circle-opacity':0.8,'circle-stroke-width':1.5,'circle-stroke-color':'rgba(255,107,157,0.3)'}});
+  map.addLayer({id:'services-labels',type:'symbol',source:'services',minzoom:13,layout:{visibility:'none','text-field':['get','nom'],'text-font':['Open Sans Regular'],'text-size':9,'text-offset':[0,1.3],'text-anchor':'top'},paint:{'text-color':'#993366','text-halo-color':'#ffffff','text-halo-width':1.5}});
+
+  // Infrastructure markers
+  createInfraMarkers();
+
+  // Click handlers — circles (low zoom) + 3D buildings (high zoom)
+  var companyLayers = ['companies-circles','companies-circles-hi','company-buildings-3d'];
+  companyLayers.forEach(function(layerId){
+    map.on('click',layerId,function(e){
+      if(editMode || !e.features||!e.features.length) return;
+      showCompanyDetail(e.features[0].properties);
+      map.easeTo({center:e.lngLat,duration:600});
+    });
+    map.on('mouseenter',layerId,function(){if(!editMode) map.getCanvas().style.cursor='pointer';});
+    map.on('mouseleave',layerId,function(){if(!editMode&&!isDragging) map.getCanvas().style.cursor='';});
+  });
+  map.on('click','services-circles',function(e){
+    if(!e.features||!e.features.length) return;
+    showServiceDetail(e.features[0].properties);
+  });
+  map.on('mouseenter','services-circles',function(){map.getCanvas().style.cursor='pointer';});
+  map.on('mouseleave','services-circles',function(){map.getCanvas().style.cursor='';});
+
+  // Loading
+  setTimeout(function(){document.getElementById('loading').classList.add('hidden');},600);
+  animateStats();
+});
+
+// ══════════════════════════════════════════
+// INFRA MARKERS
+// ══════════════════════════════════════════
+function createInfraMarkers() {
+  portSites.forEach(function(site){
+    var el = document.createElement('div');
+    el.className = 'port-marker';
+    el.innerHTML = '<div class="marker-ring"></div><div class="marker-core"></div><div class="marker-tooltip">'+site.nom+'</div>';
+    el.addEventListener('click',function(e){
+      e.stopPropagation();
+      showInfraDetail(site);
+      map.easeTo({center:site.coords,duration:600});
+    });
+    var m = new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(site.coords).addTo(map);
+    infraMarkers.push({marker:m,el:el});
+  });
+}
+
+// ══════════════════════════════════════════
+// FILTERS
+// ══════════════════════════════════════════
+function applyFilters() {
+  var filters = ['all'];
+  if (activeDomains.size < Object.keys(domainConfig).length) {
+    var domFilter = ['in','domaine'];
+    activeDomains.forEach(function(d){domFilter.push(d);});
+    filters.push(domFilter);
+  }
+  if (activeSectors.size < 9) {
+    var secFilter = ['in','secteur'];
+    activeSectors.forEach(function(s){secFilter.push(s);});
+    filters.push(secFilter);
+  }
+  // Filter function for companies
+  function matchesFilters(props) {
+    if (!activeDomains.has(props.domaine)) return false;
+    if (props.secteur !== null && props.secteur && !activeSectors.has(props.secteur)) return false;
+    if (searchQuery && props.nom.toLowerCase().indexOf(searchQuery) === -1) return false;
+    return true;
+  }
+
+  // Filter point source (circles + labels)
+  var filteredPts = {type:'FeatureCollection', features: companiesGeoJSON.features.filter(function(f){ return matchesFilters(f.properties); })};
+  map.getSource('companies').setData(filteredPts);
+
+  // Filter pre-computed buildings (keep real IGN polygons, don't regenerate cubes)
+  var allBuildings = rebuildCompanyBuildings();
+  var filteredBldg = {type:'FeatureCollection', features: allBuildings.features.filter(function(f){ return matchesFilters(f.properties); })};
+  map.getSource('company-buildings').setData(filteredBldg);
+
+  // Clear layer filters (we filter at source level now)
+  ['companies-circles','companies-circles-hi','companies-labels','company-buildings-3d','company-buildings-outline'].forEach(function(id){
+    try { map.setFilter(id, null); } catch(e){}
+  });
+
+  updateCounter(filteredPts.features.length);
+}
+
+function updateCounter(count) {
+  document.getElementById('sidebarCounter').innerHTML = '<strong>'+count+'</strong> entreprise'+(count>1?'s':'')+' visible'+(count>1?'s':'');
+}
+
+// ══════════════════════════════════════════
+// BUILD SIDEBAR FILTERS
+// ══════════════════════════════════════════
+(function buildFilters(){
+  // Domain filters
+  var container = document.getElementById('domainFilters');
+  Object.entries(domainConfig).forEach(function(entry){
+    var dom = entry[0], cfg = entry[1];
+    var btn = document.createElement('button');
+    btn.className = 'filter-chip active';
+    btn.dataset.domain = dom;
+    btn.style.color = cfg.color;
+    btn.innerHTML = '<span class="chip-dot" style="background:'+cfg.color+'"></span>'+cfg.short;
+    btn.addEventListener('click',function(){
+      this.classList.toggle('active');
+      if(this.classList.contains('active')) activeDomains.add(dom);
+      else activeDomains.delete(dom);
+      applyFilters();
+    });
+    container.appendChild(btn);
+  });
+  // Sector filters
+  var secContainer = document.getElementById('sectorFilters');
+  'ABCDEFGHI'.split('').forEach(function(letter){
+    var btn = document.createElement('button');
+    btn.className = 'sector-chip active';
+    btn.dataset.sector = letter;
+    btn.textContent = letter;
+    btn.addEventListener('click',function(){
+      this.classList.toggle('active');
+      if(this.classList.contains('active')) activeSectors.add(letter);
+      else activeSectors.delete(letter);
+      applyFilters();
+    });
+    secContainer.appendChild(btn);
+  });
+})();
+
+// Search
+var searchBoxEl = document.getElementById('searchBox');
+var searchClearEl = document.getElementById('searchClear');
+searchBoxEl.addEventListener('input',function(){
+  searchQuery = this.value.toLowerCase().trim();
+  searchClearEl.classList.toggle('visible', this.value.length > 0);
+  applyFilters();
+});
+searchClearEl.addEventListener('click',function(){
+  searchBoxEl.value = '';
+  searchQuery = '';
+  searchClearEl.classList.remove('visible');
+  applyFilters();
+});
+
+// Reset all filters
+document.getElementById('resetFilters').addEventListener('click',function(){
+  // Reset search
+  searchBoxEl.value = '';
+  searchQuery = '';
+  searchClearEl.classList.remove('visible');
+  // Reset domains — activate all
+  activeDomains = new Set(Object.keys(domainConfig));
+  document.querySelectorAll('.filter-chip').forEach(function(c){ c.classList.add('active'); });
+  // Reset sectors — activate all
+  activeSectors = new Set(['A','B','C','D','E','F','G','H','I']);
+  document.querySelectorAll('.sector-chip').forEach(function(c){ c.classList.add('active'); });
+  applyFilters();
+  showToast('Filtres reinitialises');
+});
+
+// ══════════════════════════════════════════
+// LAYER TOGGLES
+// ══════════════════════════════════════════
+document.querySelectorAll('.toggle-row').forEach(function(row){
+  row.addEventListener('click',function(){
+    this.classList.toggle('active');
+    var layer = this.dataset.layer;
+    var active = this.classList.contains('active');
+    showLayers[layer] = active;
+    try {
+      if(layer==='entreprises'){
+        ['companies-circles','companies-circles-hi','companies-labels','company-buildings-3d','company-buildings-outline'].forEach(function(id){
+          map.setLayoutProperty(id,'visibility',active?'visible':'none');
+        });
+      } else if(layer==='services'){
+        map.setLayoutProperty('services-circles','visibility',active?'visible':'none');
+        map.setLayoutProperty('services-labels','visibility',active?'visible':'none');
+      } else if(layer==='secteurs'){
+        map.setLayoutProperty('sectors-fill','visibility',active?'visible':'none');
+        map.setLayoutProperty('sectors-outline','visibility',active?'visible':'none');
+        map.setLayoutProperty('sectors-labels','visibility',active?'visible':'none');
+      } else if(layer==='infra'){
+        infraMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
+      } else if(layer==='buildings'){
+        map.setPaintProperty('buildings-3d','fill-extrusion-opacity',active?0.75:0);
+        // buildings-flat stays rendered (opacity 0) for queryRenderedFeatures
+        map.setPaintProperty('buildings-flat','fill-opacity',active?0.6:0.01);
+      }
+    }catch(e){}
+  });
+});
+
+// ══════════════════════════════════════════
+// VIEW TOGGLES
+// ══════════════════════════════════════════
+document.querySelectorAll('.view-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var mode = this.dataset.view;
+    document.querySelectorAll('.view-btn').forEach(function(b){b.classList.remove('active');});
+    this.classList.add('active');
+    if(mode==='satellite'){
+      map.setLayoutProperty('ign-plan-layer','visibility','none');
+      map.setLayoutProperty('ign-ortho-layer','visibility','visible');
+      map.setLayoutProperty('satellite-layer','visibility','none');
+    } else {
+      map.setLayoutProperty('ign-plan-layer','visibility','visible');
+      map.setLayoutProperty('ign-ortho-layer','visibility','none');
+      map.setLayoutProperty('satellite-layer','visibility','none');
+    }
+  });
+});
+
+// ══════════════════════════════════════════
+// DETAIL PANELS
+// ══════════════════════════════════════════
+// Find all companies near a coordinate (within radius in degrees)
+function findCompaniesNear(lng, lat, radius) {
+  return companiesGeoJSON.features.filter(function(f){
+    var c = f.geometry.coordinates;
+    return Math.abs(c[0]-lng) < radius && Math.abs(c[1]-lat) < radius;
+  });
+}
+
+function showCompanyDetail(p, clickLngLat) {
+  var panel = document.getElementById('detailPanel');
+
+  // Find co-located companies (same building)
+  var feat = companiesGeoJSON.features.find(function(f){return f.properties.id==p.id;});
+  var lng = feat ? feat.geometry.coordinates[0] : 0;
+  var lat = feat ? feat.geometry.coordinates[1] : 0;
+  var colocated = findCompaniesNear(lng, lat, 0.0004);
+
+  if (colocated.length > 1) {
+    // Multi-company building
+    document.getElementById('detailBar').style.background = 'linear-gradient(90deg,var(--blue-accent),var(--green-dispo),transparent)';
+    document.getElementById('detailName').textContent = colocated.length + ' entreprises dans ce batiment';
+    document.getElementById('detailBadges').innerHTML =
+      '<span class="detail-badge" style="color:var(--blue-accent);border-color:var(--glass-border);background:rgba(0,153,255,0.1)">' +
+      colocated.length + ' occupants</span>';
+
+    var html = '';
+    colocated.forEach(function(f, idx){
+      var cp = f.properties;
+      var cfg = domainConfig[cp.domaine] || {short:cp.domaine,color:'#666'};
+      html += '<div style="padding:12px 0;' + (idx>0?'border-top:1px solid var(--glass-border);':'') + '">';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      html += '<span style="width:8px;height:8px;border-radius:50%;background:'+cfg.color+';flex-shrink:0"></span>';
+      html += '<strong style="font-size:0.92rem">'+cp.nom+'</strong></div>';
+      html += '<span class="detail-badge" style="color:'+cfg.color+';border-color:'+cfg.color+'30;background:'+cfg.color+'15;margin-bottom:6px;display:inline-flex"><span class="chip-dot" style="background:'+cfg.color+'"></span>'+cfg.short+'</span>';
+      if(cp.adresse||cp.ville) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f4cd;</div><div class="detail-row-content"><div class="detail-row-value" style="font-size:0.8rem">'+(cp.adresse||'')+(cp.cp?' '+cp.cp:'')+(cp.ville?' '+cp.ville:'')+'</div></div></div>';
+      if(cp.tel) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f4de;</div><div class="detail-row-content"><div class="detail-row-value" style="font-size:0.8rem">'+cp.tel+'</div></div></div>';
+      if(cp.email) html += '<div class="detail-row"><div class="detail-row-icon">&#x2709;</div><div class="detail-row-content"><div class="detail-row-value" style="font-size:0.8rem"><a href="mailto:'+cp.email+'">'+cp.email+'</a></div></div></div>';
+      if(cp.website) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f310;</div><div class="detail-row-content"><div class="detail-row-value" style="font-size:0.8rem"><a href="'+cp.website+'" target="_blank">'+cp.website.replace(/https?:\/\//,'').replace(/\/$/,'')+'</a></div></div></div>';
+      html += '</div>';
+    });
+    document.getElementById('detailBody').innerHTML = html;
+  } else {
+    // Single company
+    var cfg = domainConfig[p.domaine] || {short:p.domaine,color:'#666'};
+    document.getElementById('detailBar').style.background = 'linear-gradient(90deg,'+cfg.color+',transparent)';
+    document.getElementById('detailName').textContent = p.nom;
+    document.getElementById('detailBadges').innerHTML =
+      '<span class="detail-badge" style="color:'+cfg.color+';border-color:'+cfg.color+'30;background:'+cfg.color+'15"><span class="chip-dot" style="background:'+cfg.color+'"></span>'+cfg.short+'</span>' +
+      (p.secteur ? '<span class="detail-badge" style="color:var(--blue-accent);border-color:var(--glass-border)">Secteur '+p.secteur+'</span>' : '');
+
+    var html = '';
+    if(p.adresse||p.ville) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f4cd;</div><div class="detail-row-content"><div class="detail-row-label">Adresse</div><div class="detail-row-value">'+(p.adresse||'')+(p.cp?' '+p.cp:'')+(p.ville?' '+p.ville:'')+'</div></div></div>';
+    if(p.tel) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f4de;</div><div class="detail-row-content"><div class="detail-row-label">Telephone</div><div class="detail-row-value">'+p.tel+'</div></div></div>';
+    if(p.email) html += '<div class="detail-row"><div class="detail-row-icon">&#x2709;</div><div class="detail-row-content"><div class="detail-row-label">Email</div><div class="detail-row-value"><a href="mailto:'+p.email+'">'+p.email+'</a></div></div></div>';
+    if(p.website) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f310;</div><div class="detail-row-content"><div class="detail-row-label">Site web</div><div class="detail-row-value"><a href="'+p.website+'" target="_blank" rel="noopener">'+p.website.replace(/https?:\/\//,'').replace(/\/$/,'')+'</a></div></div></div>';
+    var flags = '';
+    if(p.peps==='true'||p.peps===true) flags += '<span class="detail-flag on">PEPS</span>';
+    else flags += '<span class="detail-flag off">PEPS</span>';
+    if(p.cles==='true'||p.cles===true) flags += '<span class="detail-flag on">CLES</span>';
+    else flags += '<span class="detail-flag off">CLES</span>';
+    if(p.gup==='true'||p.gup===true) flags += '<span class="detail-flag on">GUP</span>';
+    else flags += '<span class="detail-flag off">GUP</span>';
+    html += '<div class="detail-flags">'+flags+'</div>';
+    html += '<button class="detail-cta">Contacter cette entreprise &rarr;</button>';
+    document.getElementById('detailBody').innerHTML = html;
+  }
+  panel.classList.add('open');
+}
+
+function showServiceDetail(p) {
+  var panel = document.getElementById('detailPanel');
+  document.getElementById('detailBar').style.background = 'linear-gradient(90deg,#FF6B9D,transparent)';
+  document.getElementById('detailName').textContent = p.nom;
+  document.getElementById('detailBadges').innerHTML = '<span class="detail-badge" style="color:#FF6B9D;border-color:rgba(255,107,157,0.3);background:rgba(255,107,157,0.1)">'+(p.type||'Service')+'</span>';
+  var html = '';
+  if(p.adresse||p.ville) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f4cd;</div><div class="detail-row-content"><div class="detail-row-label">Adresse</div><div class="detail-row-value">'+(p.adresse||'')+(p.cp?' '+p.cp:'')+(p.ville?' '+p.ville:'')+'</div></div></div>';
+  if(p.tel) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f4de;</div><div class="detail-row-content"><div class="detail-row-label">Telephone</div><div class="detail-row-value">'+p.tel+'</div></div></div>';
+  document.getElementById('detailBody').innerHTML = html;
+  panel.classList.add('open');
+}
+
+function showInfraDetail(site) {
+  var panel = document.getElementById('detailPanel');
+  document.getElementById('detailBar').style.background = 'linear-gradient(90deg,var(--blue-accent),transparent)';
+  document.getElementById('detailName').textContent = site.nom;
+  document.getElementById('detailBadges').innerHTML = '<span class="detail-badge" style="color:var(--blue-accent);border-color:rgba(0,153,255,0.3);background:rgba(0,153,255,0.1)">Infrastructure</span>';
+  document.getElementById('detailBody').innerHTML = '<div class="detail-row"><div class="detail-row-icon">&#x2699;</div><div class="detail-row-content"><div class="detail-row-label">Description</div><div class="detail-row-value">'+site.desc+'</div></div></div><button class="detail-cta">Demander plus d\'informations &rarr;</button>';
+  panel.classList.add('open');
+}
+
+function hideDetail(){document.getElementById('detailPanel').classList.remove('open');}
+document.getElementById('detailClose').addEventListener('click',hideDetail);
+map.on('click',function(e){
+  var features = map.queryRenderedFeatures(e.point,{layers:['companies-circles','companies-circles-hi','company-buildings-3d','services-circles']});
+  if(!features.length) hideDetail();
+});
+
+// ══════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════
+function animateStats() {
+  var targets = [
+    {el:document.getElementById('stat1'),target:280,suffix:''},
+    {el:document.getElementById('stat2'),target:9,suffix:''},
+    {el:document.getElementById('stat3'),target:35,suffix:''},
+    {el:document.getElementById('stat4'),target:2,suffix:'e'}
+  ];
+  var duration = 2000, start = performance.now();
+  function tick(now){
+    var p = Math.min((now-start)/duration,1), ease = 1-Math.pow(1-p,3);
+    targets.forEach(function(t){t.el.textContent=Math.round(ease*t.target)+t.suffix;});
+    if(p<1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// Mobile sidebar
+var pull = document.getElementById('sidebarPull');
+if(pull) pull.addEventListener('click',function(){document.getElementById('sidebar').classList.toggle('expanded');});
+
+// ══════════════════════════════════════════
+// EDIT MODE — DRAG & DROP
+// ══════════════════════════════════════════
+var editMode = false;
+var isDragging = false;
+var dragFeatureId = null;
+var movedIds = new Set();
+
+// Toast
+var toastEl = document.createElement('div');
+toastEl.className = 'toast';
+document.body.appendChild(toastEl);
+var toastTimer = null;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2500);
+}
+
+// Populate domain select in modal
+var modalDomSelect = document.getElementById('modalDomaine');
+Object.entries(domainConfig).forEach(function(e){
+  var opt = document.createElement('option');
+  opt.value = e[0]; opt.textContent = e[1].short + ' — ' + e[0];
+  modalDomSelect.appendChild(opt);
+});
+
+// State for new company creation
+var pendingBuilding = null; // {geometry, hauteur, lngLat}
+var nextId = 1000;
+
+// Toggle edit mode
+document.getElementById('editToggle').addEventListener('click', function(){
+  editMode = !editMode;
+  this.classList.toggle('active', editMode);
+  this.querySelector('.edit-badge').textContent = editMode ? 'ON' : 'OFF';
+  map.getCanvas().style.cursor = editMode ? 'crosshair' : '';
+  if (editMode) {
+    showToast('Cliquez sur un batiment vide pour ajouter une entreprise, ou glissez un point existant');
+  } else {
+    showToast('Mode edition desactive');
+  }
+});
+
+// Click on IGN building (bati_surf) in edit mode → open add form
+map.on('click', 'buildings-flat', function(e) {
+  if (!editMode || isDragging) return;
+  if (!e.features || !e.features.length) return;
+
+  // Find companies already at this location
+  var pixel = e.point;
+  var companyHits = map.queryRenderedFeatures(
+    [[pixel.x-15, pixel.y-15],[pixel.x+15, pixel.y+15]],
+    {layers:['company-buildings-3d','companies-circles']}
+  );
+  var occupants = findCompaniesNear(e.lngLat.lng, e.lngLat.lat, 0.0004);
+
+  // Capture building info
+  var bldg = e.features[0];
+  var hauteur = bldg.properties.hauteur || 0;
+  pendingBuilding = {
+    geometry: bldg.geometry,
+    hauteur: hauteur,
+    lngLat: [e.lngLat.lng, e.lngLat.lat]
+  };
+
+  // Fill modal info with existing occupants
+  var infoHtml = 'Batiment IGN — <strong>' +
+    (hauteur > 0 ? hauteur + ' m' : 'hauteur inconnue') + '</strong>';
+  if (occupants.length > 0) {
+    infoHtml += '<br><span style="color:var(--text-secondary);font-size:0.72rem">' +
+      occupants.length + ' entreprise(s) deja presente(s) :</span>';
+    occupants.forEach(function(occ) {
+      var cfg = domainConfig[occ.properties.domaine] || {short:'?',color:'#666'};
+      infoHtml += '<br><span style="color:'+cfg.color+'">&#9679;</span> ' + occ.properties.nom;
+    });
+  }
+  document.getElementById('modalBuildingInfo').innerHTML = infoHtml;
+  document.getElementById('modalLat').value = e.lngLat.lat.toFixed(6);
+  document.getElementById('modalLng').value = e.lngLat.lng.toFixed(6);
+  document.getElementById('modalNom').value = '';
+  document.getElementById('modalAdresse').value = '';
+  document.getElementById('modalVille').value = occupants.length > 0 ? (occupants[0].properties.ville || 'Strasbourg') : 'Strasbourg';
+  document.getElementById('modalCP').value = occupants.length > 0 ? (occupants[0].properties.cp || '67000') : '67000';
+  document.getElementById('modalTel').value = '';
+  document.getElementById('modalEmail').value = '';
+  document.getElementById('modalWebsite').value = '';
+
+  // Highlight the building
+  if (map.getSource('highlight-building')) {
+    map.getSource('highlight-building').setData({type:'FeatureCollection',features:[{type:'Feature',geometry:bldg.geometry,properties:{}}]});
+    map.setPaintProperty('highlight-building-fill','fill-extrusion-height', hauteur || 12);
+  } else {
+    map.addSource('highlight-building',{type:'geojson',data:{type:'FeatureCollection',features:[{type:'Feature',geometry:bldg.geometry,properties:{}}]}});
+    map.addLayer({id:'highlight-building-fill',type:'fill-extrusion',source:'highlight-building',paint:{
+      'fill-extrusion-color':'#0099FF',
+      'fill-extrusion-height': hauteur || 12,
+      'fill-extrusion-opacity':0.6
+    }});
+    map.addLayer({id:'highlight-building-outline',type:'line',source:'highlight-building',paint:{'line-color':'#0099FF','line-width':2.5,'line-opacity':0.9}});
+  }
+
+  document.getElementById('addModal').classList.add('open');
+});
+
+// Hover on empty buildings in edit mode
+map.on('mouseenter', 'buildings-flat', function() {
+  if (editMode && !isDragging) map.getCanvas().style.cursor = 'pointer';
+});
+map.on('mouseleave', 'buildings-flat', function() {
+  if (editMode && !isDragging) map.getCanvas().style.cursor = 'crosshair';
+});
+
+// Cancel modal
+document.getElementById('modalCancel').addEventListener('click', function(){
+  document.getElementById('addModal').classList.remove('open');
+  if (map.getSource('highlight-building')) {
+    map.getSource('highlight-building').setData({type:'FeatureCollection',features:[]});
+  }
+  pendingBuilding = null;
+});
+
+// Save new company
+document.getElementById('modalSave').addEventListener('click', function(){
+  var nom = document.getElementById('modalNom').value.trim();
+  var domaine = document.getElementById('modalDomaine').value;
+  if (!nom) { document.getElementById('modalNom').style.borderColor='#e74c3c'; return; }
+
+  nextId++;
+  var newFeature = {
+    type:'Feature',
+    geometry:{type:'Point', coordinates: pendingBuilding.lngLat},
+    properties:{
+      id: nextId,
+      nom: nom,
+      domaine: domaine,
+      secteur: null,
+      adresse: document.getElementById('modalAdresse').value.trim(),
+      ville: document.getElementById('modalVille').value.trim(),
+      cp: document.getElementById('modalCP').value.trim(),
+      tel: document.getElementById('modalTel').value.trim(),
+      email: document.getElementById('modalEmail').value.trim(),
+      website: document.getElementById('modalWebsite').value.trim(),
+      peps: false, cles: false, gup: false,
+      _new: true
+    }
+  };
+
+  // Add to data
+  companiesGeoJSON.features.push(newFeature);
+
+  // Update map sources
+  invalidateBuildingsCache();
+  map.getSource('companies').setData(companiesGeoJSON);
+  map.getSource('company-buildings').setData(rebuildCompanyBuildings());
+
+  // Clear highlight
+  if (map.getSource('highlight-building')) {
+    map.getSource('highlight-building').setData({type:'FeatureCollection',features:[]});
+  }
+
+  // Close modal
+  document.getElementById('addModal').classList.remove('open');
+  pendingBuilding = null;
+
+  // Update counter
+  applyFilters();
+  document.getElementById('exportBtn').classList.add('visible');
+
+  showToast(nom + ' ajoutee avec succes');
+
+});
+
+// Mousedown on company circle OR 3D building
+['companies-circles','companies-circles-hi','company-buildings-3d'].forEach(function(layerId){
+  map.on('mousedown', layerId, function(e){
+    if (!editMode || !e.features || !e.features.length) return;
+    e.preventDefault();
+    isDragging = true;
+    dragFeatureId = e.features[0].properties.id;
+    map.getCanvas().style.cursor = 'grabbing';
+    map.dragPan.disable();
+    map.dragRotate.disable();
+  });
+});
+
+// Mousemove — update point, hide old building during drag
+map.on('mousemove', function(e){
+  if (!isDragging || dragFeatureId === null) return;
+  var coords = [e.lngLat.lng, e.lngLat.lat];
+  for (var i = 0; i < companiesGeoJSON.features.length; i++) {
+    if (companiesGeoJSON.features[i].properties.id == dragFeatureId) {
+      companiesGeoJSON.features[i].geometry.coordinates = coords;
+      break;
+    }
+  }
+  map.getSource('companies').setData(companiesGeoJSON);
+  // Hide the old building for the dragged company — show only the moving point
+  var buildings = rebuildCompanyBuildings();
+  buildings.features = buildings.features.filter(function(f){ return f.properties.id != dragFeatureId; });
+  map.getSource('company-buildings').setData(buildings);
+});
+
+// Mouseup — finalize: snap to IGN building under drop position
+map.on('mouseup', function(e){
+  if (!isDragging) return;
+  if (dragFeatureId !== null) {
+    movedIds.add(dragFeatureId);
+    var feat = companiesGeoJSON.features.find(function(f){ return f.properties.id == dragFeatureId; });
+
+    // Try to find the IGN building at the drop location
+    var pixel = e.point || map.project(e.lngLat);
+    var bldgHits = map.queryRenderedFeatures(
+      [[pixel.x-25, pixel.y-25],[pixel.x+25, pixel.y+25]],
+      {layers:['buildings-flat']}
+    );
+
+    if (bldgHits.length > 0 && feat) {
+      var bldg = bldgHits[0];
+      var props = {};
+      for (var k in feat.properties) props[k] = feat.properties[k];
+      props._height = bldg.properties.hauteur || heightByDomain[feat.properties.domaine] || 12;
+      props._usage = bldg.properties.usage_1 || '';
+      props._occupants = 1;
+
+      // Remove old entry from matchedBuildingsGeoJSON and add new one with real building shape
+      if (typeof matchedBuildingsGeoJSON !== 'undefined') {
+        matchedBuildingsGeoJSON.features = matchedBuildingsGeoJSON.features.filter(function(f){
+          return f.properties.id != dragFeatureId;
+        });
+        matchedBuildingsGeoJSON.features.push({
+          type:'Feature',
+          geometry: bldg.geometry,
+          properties: props
+        });
+      }
+      showToast(feat.properties.nom + ' — place sur batiment IGN (' + (bldg.properties.hauteur||'?') + ' m)');
+    } else if (feat) {
+      // No building found — remove from pre-computed (will show as circle)
+      if (typeof matchedBuildingsGeoJSON !== 'undefined') {
+        matchedBuildingsGeoJSON.features = matchedBuildingsGeoJSON.features.filter(function(f){
+          return f.properties.id != dragFeatureId;
+        });
+      }
+      var c = feat.geometry.coordinates;
+      showToast(feat.properties.nom + ' — deplac\u00e9 (pas de batiment)');
+    }
+
+    // Refresh map
+    invalidateBuildingsCache();
+    map.getSource('companies').setData(companiesGeoJSON);
+    map.getSource('company-buildings').setData(rebuildCompanyBuildings());
+    document.getElementById('exportBtn').classList.add('visible');
+  }
+  isDragging = false;
+  dragFeatureId = null;
+  map.getCanvas().style.cursor = editMode ? 'crosshair' : '';
+  map.dragPan.enable();
+  map.dragRotate.enable();
+});
+
+// Hover cursor in edit mode
+['companies-circles','companies-circles-hi','company-buildings-3d'].forEach(function(layerId){
+  map.on('mouseenter', layerId, function(){
+    if (editMode) map.getCanvas().style.cursor = 'grab';
+  });
+  map.on('mouseleave', layerId, function(){
+    if (editMode && !isDragging) map.getCanvas().style.cursor = 'crosshair';
+  });
+});
+
+// Export — moved positions + new companies
+document.getElementById('exportBtn').addEventListener('click', function(){
+  var moved = companiesGeoJSON.features.filter(function(f){ return movedIds.has(f.properties.id); });
+  var added = companiesGeoJSON.features.filter(function(f){ return f.properties._new; });
+  var all = moved.concat(added);
+  var json = all.map(function(f){
+    var p = f.properties;
+    var out = {id:p.id, nom:p.nom, lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0]};
+    if (p._new) {
+      out.nouveau = true;
+      out.domaine = p.domaine;
+      out.adresse = p.adresse;
+      out.ville = p.ville;
+      out.cp = p.cp;
+      out.tel = p.tel;
+      out.email = p.email;
+      out.website = p.website;
+    }
+    return out;
+  });
+  navigator.clipboard.writeText(JSON.stringify(json, null, 2)).then(function(){
+    var msg = '';
+    if (moved.length) msg += moved.length + ' deplacee(s)';
+    if (added.length) msg += (msg?' + ':'') + added.length + ' ajoutee(s)';
+    showToast(msg + ' — copiee(s) dans le presse-papier');
+  }).catch(function(){
+    console.log('Export:', JSON.stringify(json, null, 2));
+    showToast('Donnees affichees dans la console (F12)');
+  });
+});
+
+// Watermark
+(function(){var w=document.createElement('div');w.style.cssText='position:fixed;bottom:24px;right:20px;z-index:50;font-size:0.65rem;color:rgba(255,255,255,0.2);font-family:Inter,sans-serif;pointer-events:none;';w.textContent='Demo \u2014 French4 Dev \u2014 jean-charles@french4.dev';document.body.appendChild(w);})();
+</script>
+</body>
+</html>
