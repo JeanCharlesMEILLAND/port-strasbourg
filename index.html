@@ -151,6 +151,10 @@ body {
 .export-btn:hover { border-color:var(--glass-border-hover); color:var(--text-secondary); }
 .export-btn.visible { display:block; }
 
+/* Company logo */
+.detail-logo { width:48px; height:48px; border-radius:8px; object-fit:contain; background:rgba(255,255,255,0.08); border:1px solid var(--glass-border); padding:4px; }
+.company-logo-sm { width:28px; height:28px; border-radius:6px; object-fit:contain; background:rgba(255,255,255,0.06); border:1px solid var(--glass-border); padding:2px; flex-shrink:0; }
+
 /* Add company modal */
 .modal-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; }
 .modal-overlay.open { display:flex; }
@@ -298,10 +302,10 @@ body {
   <div class="sidebar-section">
     <div class="sidebar-section-title">Couches</div>
     <div class="toggle-row active" data-layer="entreprises"><span class="toggle-label">Entreprises (280)</span><div class="toggle-switch"></div></div>
-    <div class="toggle-row" data-layer="services"><span class="toggle-label">Services (35)</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row active" data-layer="services"><span class="toggle-label">Services (35)</span><div class="toggle-switch"></div></div>
     <div class="toggle-row" data-layer="secteurs"><span class="toggle-label">Zones secteurs</span><div class="toggle-switch"></div></div>
     <div class="toggle-row active" data-layer="infra"><span class="toggle-label">Infrastructure</span><div class="toggle-switch"></div></div>
-    <div class="toggle-row active" data-layer="buildings"><span class="toggle-label">Batiments 3D</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row" data-layer="buildings"><span class="toggle-label">Batiments 3D (IGN)</span><div class="toggle-switch"></div></div>
   </div>
 
   <div class="sidebar-section">
@@ -497,7 +501,7 @@ var rhineCoords = [[7.53,48.05],[7.54,48.10],[7.546,48.083],[7.56,48.15],[7.60,4
 // ══════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════
-var showLayers = {entreprises:true,services:false,secteurs:false,infra:true,buildings:true};
+var showLayers = {entreprises:true,services:true,secteurs:false,infra:true,buildings:false};
 var activeDomains = new Set(Object.keys(domainConfig));
 var activeSectors = new Set(['A','B','C','D','E','F','G','H','I']);
 var searchQuery = '';
@@ -535,8 +539,8 @@ var mapStyle = {
     {id:'road-trunk',type:'line',source:'openmaptiles','source-layer':'transportation',filter:['any',['==','class','trunk'],['==','class','motorway']],paint:{'line-color':'#f8c080','line-width':['interpolate',['linear'],['zoom'],5,1,14,5]}},
     {id:'railway',type:'line',source:'openmaptiles','source-layer':'transportation',filter:['==','class','rail'],paint:{'line-color':'#c0b0c8','line-width':1,'line-dasharray':[4,3]}},
     {id:'boundary',type:'line',source:'openmaptiles','source-layer':'boundary',filter:['==','admin_level',2],paint:{'line-color':'#b0a0c0','line-width':1.5,'line-dasharray':[6,3]}},
-    {id:'buildings-flat',type:'fill',source:'ign-vector','source-layer':'bati_surf',minzoom:13,paint:{'fill-color':'#d0c8c0','fill-opacity':0.6}},
-    {id:'buildings-3d',type:'fill-extrusion',source:'ign-vector','source-layer':'bati_surf',minzoom:13,paint:{'fill-extrusion-color':['interpolate',['linear'],['coalesce',['get','hauteur'],5],0,'#d5cec5',10,'#c8beb5',20,'#b8aaa0',40,'#a09080'],'fill-extrusion-height':['interpolate',['linear'],['zoom'],13,0,14.5,['coalesce',['get','hauteur'],5]],'fill-extrusion-base':0,'fill-extrusion-opacity':0.8}},
+    {id:'buildings-flat',type:'fill',source:'ign-vector','source-layer':'bati_surf',minzoom:13,paint:{'fill-color':'#d0c8c0','fill-opacity':0.01}},
+    {id:'buildings-3d',type:'fill-extrusion',source:'ign-vector','source-layer':'bati_surf',minzoom:13,paint:{'fill-extrusion-color':['interpolate',['linear'],['coalesce',['get','hauteur'],5],0,'#d5cec5',10,'#c8beb5',20,'#b8aaa0',40,'#a09080'],'fill-extrusion-height':['interpolate',['linear'],['zoom'],13,0,14.5,['coalesce',['get','hauteur'],5]],'fill-extrusion-base':0,'fill-extrusion-opacity':0}},
     {id:'place-town',type:'symbol',source:'openmaptiles','source-layer':'place',filter:['==','class','town'],minzoom:8,layout:{'text-field':['get','name'],'text-font':['Open Sans Regular'],'text-size':11,'text-padding':10},paint:{'text-color':'#555555','text-halo-color':'#ffffff','text-halo-width':2}},
     {id:'place-city',type:'symbol',source:'openmaptiles','source-layer':'place',filter:['==','class','city'],layout:{'text-field':['get','name'],'text-font':['Open Sans Bold'],'text-size':['interpolate',['linear'],['zoom'],6,12,12,20],'text-padding':12},paint:{'text-color':'#333333','text-halo-color':'#ffffff','text-halo-width':2.5}}
   ]
@@ -619,8 +623,15 @@ map.on('load', function() {
 
   // Services
   map.addSource('services',{type:'geojson',data:servicesGeoJSON});
-  map.addLayer({id:'services-circles',type:'circle',source:'services',layout:{visibility:'none'},paint:{'circle-radius':['interpolate',['linear'],['zoom'],8,3,12,5,15,8],'circle-color':'#FF6B9D','circle-opacity':0.8,'circle-stroke-width':1.5,'circle-stroke-color':'rgba(255,107,157,0.3)'}});
-  map.addLayer({id:'services-labels',type:'symbol',source:'services',minzoom:13,layout:{visibility:'none','text-field':['get','nom'],'text-font':['Open Sans Regular'],'text-size':9,'text-offset':[0,1.3],'text-anchor':'top'},paint:{'text-color':'#993366','text-halo-color':'#ffffff','text-halo-width':1.5}});
+  map.addLayer({id:'services-circles',type:'circle',source:'services',paint:{
+    'circle-radius':['interpolate',['linear'],['zoom'],8,4,14,7,17,10],
+    'circle-color':['match',['get','type'],
+      'appontements croisières','#2196F3','appontements mixtes','#00BCD4','appontements mariniers','#009688',
+      'restauration','#FF5722','hôtel','#9C27B0','stations-services','#FF9800',
+      'parking PL','#607D8B','points d\'intérêt','#4CAF50','espace de gestion des déchets','#8BC34A',
+      '#E91E63'],
+    'circle-opacity':0.9,'circle-stroke-width':2,'circle-stroke-color':'rgba(255,255,255,0.5)'}});
+  map.addLayer({id:'services-labels',type:'symbol',source:'services',minzoom:14,layout:{'text-field':['get','nom'],'text-font':['Open Sans Regular'],'text-size':9,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14},paint:{'text-color':'#444','text-halo-color':'#ffffff','text-halo-width':1.5}});
 
   // Infrastructure markers
   createInfraMarkers();
@@ -865,7 +876,8 @@ function showCompanyDetail(p, clickLngLat) {
       var cfg = domainConfig[cp.domaine] || {short:cp.domaine,color:'#666'};
       html += '<div style="padding:12px 0;' + (idx>0?'border-top:1px solid var(--glass-border);':'') + '">';
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
-      html += '<span style="width:8px;height:8px;border-radius:50%;background:'+cfg.color+';flex-shrink:0"></span>';
+      if (cp.logo) html += '<img class="company-logo-sm" src="'+cp.logo+'" alt="" onerror="this.style.display=\'none\'">';
+      else html += '<span style="width:8px;height:8px;border-radius:50%;background:'+cfg.color+';flex-shrink:0"></span>';
       html += '<strong style="font-size:0.92rem">'+cp.nom+'</strong></div>';
       html += '<span class="detail-badge" style="color:'+cfg.color+';border-color:'+cfg.color+'30;background:'+cfg.color+'15;margin-bottom:6px;display:inline-flex"><span class="chip-dot" style="background:'+cfg.color+'"></span>'+cfg.short+'</span>';
       if(cp.adresse||cp.ville) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f4cd;</div><div class="detail-row-content"><div class="detail-row-value" style="font-size:0.8rem">'+(cp.adresse||'')+(cp.cp?' '+cp.cp:'')+(cp.ville?' '+cp.ville:'')+'</div></div></div>';
@@ -879,7 +891,7 @@ function showCompanyDetail(p, clickLngLat) {
     // Single company
     var cfg = domainConfig[p.domaine] || {short:p.domaine,color:'#666'};
     document.getElementById('detailBar').style.background = 'linear-gradient(90deg,'+cfg.color+',transparent)';
-    document.getElementById('detailName').textContent = p.nom;
+    document.getElementById('detailName').innerHTML = (p.logo ? '<div style="display:flex;align-items:center;gap:10px"><img class="detail-logo" src="'+p.logo+'" alt="" onerror="this.style.display=\'none\'"><span>'+p.nom+'</span></div>' : p.nom);
     document.getElementById('detailBadges').innerHTML =
       '<span class="detail-badge" style="color:'+cfg.color+';border-color:'+cfg.color+'30;background:'+cfg.color+'15"><span class="chip-dot" style="background:'+cfg.color+'"></span>'+cfg.short+'</span>' +
       (p.secteur ? '<span class="detail-badge" style="color:var(--blue-accent);border-color:var(--glass-border)">Secteur '+p.secteur+'</span>' : '');
