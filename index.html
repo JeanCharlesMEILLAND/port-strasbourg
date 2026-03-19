@@ -708,7 +708,23 @@ rebuildCompanyBuildings = function() {
 };
 function invalidateBuildingsCache() { _buildingsCacheDirty = true; }
 
-var map = new maplibregl.Map({container:'map',style:mapStyle,center:[7.790,48.565],zoom:14.5,pitch:50,bearing:-15,antialias:true,maxPitch:70});
+// Restore saved view or use default
+var savedView = null;
+try { savedView = JSON.parse(localStorage.getItem('pas_mapview')); } catch(e){}
+var initView = savedView || {center:[7.790,48.565],zoom:14.5,pitch:50,bearing:-15};
+var map = new maplibregl.Map({container:'map',style:mapStyle,center:initView.center,zoom:initView.zoom,pitch:initView.pitch,bearing:initView.bearing,antialias:true,maxPitch:70});
+
+// Save view on every move
+var saveViewTimer = null;
+map.on('moveend',function(){
+  clearTimeout(saveViewTimer);
+  saveViewTimer = setTimeout(function(){
+    var c = map.getCenter();
+    localStorage.setItem('pas_mapview',JSON.stringify({
+      center:[c.lng,c.lat], zoom:map.getZoom(), pitch:map.getPitch(), bearing:map.getBearing()
+    }));
+  },500);
+});
 map.addControl(new maplibregl.NavigationControl({showCompass:true,showZoom:true,visualizePitch:true}),'top-right');
 
 map.on('load', function() {
