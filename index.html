@@ -262,6 +262,50 @@ body {
   .hud-stats { width:calc(100% - 24px); border-radius:16px; bottom:12px; }
   .logo-name { font-size:0.85rem; }
 }
+/* Thematic layers */
+.layer-legend { display:flex; gap:8px; margin-top:4px; padding:2px 0; }
+.legend-item { display:flex; align-items:center; gap:4px; font-size:0.65rem; color:var(--text-muted); }
+.legend-line { width:14px; height:3px; border-radius:2px; }
+.legend-circle { width:8px; height:8px; border-radius:50%; }
+.energy-counter { text-align:center; padding:8px; border-radius:var(--radius-sm); background:rgba(255,100,0,0.06); border:1px solid rgba(255,100,0,0.15); font-size:0.75rem; color:#FF8C00; margin-top:6px; display:none; }
+.energy-counter.visible { display:block; }
+.energy-counter strong { font-size:0.95rem; }
+.quai-marker { width:28px; height:28px; background:#003580; border-radius:4px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.3); transition:var(--transition); }
+.quai-marker:hover { transform:scale(1.15); }
+.quai-marker::after { content:''; width:14px; height:2px; background:white; border-radius:1px; }
+.energy-dot { position:relative; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.energy-pulse { position:absolute; border-radius:50%; opacity:0.3; animation:ePulse 2s ease-out infinite; }
+@keyframes ePulse { 0%{transform:scale(0.5);opacity:0.4;} 100%{transform:scale(2.5);opacity:0;} }
+.energy-core { border-radius:50%; position:relative; z-index:1; border:2px solid rgba(255,255,255,0.5); }
+
+/* Comparator modal */
+.comp-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; }
+.comp-overlay.open { display:flex; }
+.comp-panel { background:var(--glass); backdrop-filter:blur(24px); border:1px solid var(--glass-border); border-radius:var(--radius); width:680px; max-width:calc(100vw - 40px); max-height:calc(100vh - 60px); overflow-y:auto; padding:24px; animation:modalIn 0.3s ease; }
+.comp-title { font-size:1.15rem; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.comp-inputs { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+.comp-full { grid-column:1/-1; }
+.comp-slider-row { display:flex; align-items:center; gap:10px; }
+.comp-slider-row input[type=range] { flex:1; -webkit-appearance:none; height:4px; background:rgba(255,255,255,0.15); border-radius:2px; outline:none; }
+.comp-slider-row input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--blue-accent); cursor:pointer; }
+.comp-slider-val { min-width:60px; text-align:right; font-weight:700; font-size:0.9rem; color:var(--text-primary); }
+.comp-results { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+.comp-card { background:rgba(255,255,255,0.03); border:1px solid var(--glass-border); border-radius:var(--radius-sm); padding:16px; text-align:center; transition:var(--transition); }
+.comp-card:hover { border-color:var(--glass-border-hover); }
+.comp-card-icon { font-size:1.8rem; margin-bottom:6px; }
+.comp-card-mode { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-secondary); margin-bottom:10px; }
+.comp-co2 { font-size:1.6rem; font-weight:800; margin-bottom:2px; }
+.comp-co2.high { color:#e74c3c; }
+.comp-co2.mid { color:#f39c12; }
+.comp-co2.low { color:#27ae60; }
+.comp-detail { font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; }
+.comp-bar { height:6px; border-radius:3px; margin-top:8px; transition:width 0.5s ease; }
+.comp-saving { display:inline-block; padding:3px 8px; border-radius:10px; font-size:0.68rem; font-weight:700; background:rgba(39,174,96,0.12); color:#27ae60; margin-top:6px; }
+.comp-footer { font-size:0.65rem; color:var(--text-muted); text-align:center; margin-top:16px; padding-top:12px; border-top:1px solid var(--glass-border); }
+.comp-close { position:absolute; top:16px; right:16px; width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,0.06); border:none; color:var(--text-muted); font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:var(--transition); font-family:inherit; }
+.comp-close:hover { background:rgba(255,255,255,0.12); color:var(--text-primary); }
+@media (max-width:700px) { .comp-results { grid-template-columns:1fr; } .comp-inputs { grid-template-columns:1fr; } }
+
 .sidebar-pull { display:none; }
 </style>
 </head>
@@ -303,10 +347,30 @@ body {
     <div class="sidebar-section-title">Couches</div>
     <div class="toggle-row active" data-layer="entreprises"><span class="toggle-label">Entreprises (280)</span><div class="toggle-switch"></div></div>
     <div class="toggle-row active" data-layer="appontements"><span class="toggle-label">Appontements (16)</span><div class="toggle-switch"></div></div>
-    <div class="toggle-row active" data-layer="services"><span class="toggle-label">Services (19)</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row active" data-layer="services"><span class="toggle-label">Services (14)</span><div class="toggle-switch"></div></div>
     <div class="toggle-row" data-layer="secteurs"><span class="toggle-label">Zones secteurs</span><div class="toggle-switch"></div></div>
     <div class="toggle-row active" data-layer="infra"><span class="toggle-label">Infrastructure</span><div class="toggle-switch"></div></div>
     <div class="toggle-row" data-layer="buildings"><span class="toggle-label">Batiments 3D (IGN)</span><div class="toggle-switch"></div></div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Couches thematiques</div>
+    <div class="toggle-row" data-layer="ite"><span class="toggle-label">&#x1f682; Voies ferrees &amp; quais</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row active" data-layer="flux"><span class="toggle-label">&#x1f4e6; Flux de fret</span><div class="toggle-switch"></div></div>
+    <div class="layer-legend" id="fluxLegend">
+      <span class="legend-item"><span class="legend-line" style="background:#0078FF"></span>Fluvial</span>
+      <span class="legend-item"><span class="legend-line" style="background:#FF8C00"></span>Ferroviaire</span>
+      <span class="legend-item"><span class="legend-line" style="background:#64C864"></span>Routier</span>
+    </div>
+    <div class="toggle-row" data-layer="energie"><span class="toggle-label">&#x26A1; Reseau R-PAS</span><div class="toggle-switch"></div></div>
+    <div class="energy-counter" id="energyCounter">&#x26A1; <strong>25 MW</strong> recuperes &middot; ~<strong>10 800</strong> t CO&#x2082;/an evitees</div>
+  </div>
+
+  <div class="sidebar-section">
+    <button class="edit-toggle" id="compBtn" style="border-color:var(--green-dispo);color:var(--green-dispo);margin-bottom:0">
+      <span>&#x1f33f; Comparateur modal CO&#x2082;</span>
+      <span class="edit-badge" style="background:rgba(0,204,136,0.15);color:var(--green-dispo)">Ouvrir</span>
+    </button>
   </div>
 
   <div class="sidebar-section">
@@ -407,6 +471,26 @@ body {
   </div>
 </div>
 
+<!-- Comparateur modal CO2 -->
+<div class="comp-overlay" id="compOverlay">
+  <div class="comp-panel" style="position:relative">
+    <button class="comp-close" id="compClose">&times;</button>
+    <div class="comp-title">&#x1f33f; Comparateur modal CO&#x2082;</div>
+    <div class="comp-inputs">
+      <div class="modal-field"><label class="modal-label">Origine</label><input class="modal-input" id="compOrig" value="Strasbourg Port Sud"></div>
+      <div class="modal-field"><label class="modal-label">Destination</label><input class="modal-input" id="compDest" value="Mannheim"></div>
+      <div class="modal-field"><label class="modal-label">Tonnage</label>
+        <div class="comp-slider-row"><input type="range" id="compTonnage" min="10" max="5000" value="500" step="10"><span class="comp-slider-val" id="compTonnageVal">500 t</span></div>
+      </div>
+      <div class="modal-field"><label class="modal-label">Distance (km)</label>
+        <div class="comp-slider-row"><input type="range" id="compDist" min="50" max="800" value="200" step="10"><span class="comp-slider-val" id="compDistVal">200 km</span></div>
+      </div>
+    </div>
+    <div class="comp-results" id="compResults"></div>
+    <div class="comp-footer">Donnees : facteurs d'emission ADEME 2023 — estimations indicatives — Demo French4 Dev</div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="data.js"></script>
 <script src="matched-buildings.js"></script>
@@ -496,6 +580,60 @@ var portSites = [
   {nom:'Port de Rhinau',         coords:[7.712,48.317], desc:'Zone de developpement'},
   {nom:'Port de Seltz',          coords:[8.064,48.897], desc:'Vrac solide'}
 ];
+
+// ══════════════════════════════════════════
+// THEMATIC LAYER DATA
+// ══════════════════════════════════════════
+var iteData = {type:"FeatureCollection",features:[
+  {type:"Feature",geometry:{type:"LineString",coordinates:[[7.740,48.520],[7.748,48.524],[7.755,48.528],[7.762,48.532]]},properties:{nom:"ITE Terminal Sud",type:"ite",entreprise:"CMA CGM / DB Cargo",longueur:"1.2 km",actif:true}},
+  {type:"Feature",geometry:{type:"LineString",coordinates:[[7.762,48.532],[7.768,48.538],[7.772,48.545]]},properties:{nom:"ITE Nexans",type:"ite",entreprise:"Nexans France",longueur:"0.6 km",actif:true}},
+  {type:"Feature",geometry:{type:"LineString",coordinates:[[7.775,48.598],[7.785,48.605],[7.795,48.612],[7.803,48.618]]},properties:{nom:"ITE Port Nord",type:"ite",entreprise:"Fret SNCF / XPO",longueur:"2.1 km",actif:true}},
+  {type:"Feature",geometry:{type:"LineString",coordinates:[[7.758,48.555],[7.762,48.560],[7.765,48.568]]},properties:{nom:"ITE Lesaffre",type:"ite",entreprise:"Lesaffre Panification",longueur:"0.4 km",actif:false}},
+  {type:"Feature",geometry:{type:"LineString",coordinates:[[7.770,48.575],[7.778,48.580],[7.784,48.585]]},properties:{nom:"ITE Blue Paper",type:"ite",entreprise:"Blue Paper",longueur:"0.8 km",actif:true}}
+]};
+
+var quaisData = {type:"FeatureCollection",features:[
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.760,48.527]},properties:{nom:"Quai 1 \u2014 Conteneurs",capacite:"2 peniches",tirant_eau:"3.5m",statut:"operationnel"}},
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.762,48.530]},properties:{nom:"Quai 2 \u2014 Vracs solides",capacite:"1 peniche",tirant_eau:"2.8m",statut:"operationnel"}},
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.798,48.614]},properties:{nom:"Quai Nord \u2014 Logistique",capacite:"3 peniches",tirant_eau:"3.2m",statut:"operationnel"}},
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.764,48.540]},properties:{nom:"Quai 4 \u2014 Hydrocarbures",capacite:"1 peniche",tirant_eau:"4.0m",statut:"maintenance"}},
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.756,48.522]},properties:{nom:"Quai Sud \u2014 Cereales",capacite:"2 peniches",tirant_eau:"3.0m",statut:"operationnel"}}
+]};
+
+var fluxFret = [
+  {from:[7.546,48.083],to:[7.762,48.527],tonnage:280000,mode:"fluvial",label:"Cereales Marckolsheim \u2192 Terminal Sud"},
+  {from:[7.762,48.527],to:[7.803,48.618],tonnage:180000,mode:"ferroviaire",label:"Conteneurs Sud \u2192 Nord"},
+  {from:[7.762,48.527],to:[7.958,48.752],tonnage:150000,mode:"fluvial",label:"Vrac \u2192 Drusenheim"},
+  {from:[7.739,48.438],to:[7.762,48.527],tonnage:120000,mode:"ferroviaire",label:"Plobsheim \u2192 Terminal Sud"},
+  {from:[7.762,48.527],to:[8.178,48.973],tonnage:95000,mode:"fluvial",label:"Export \u2192 Lauterbourg"},
+  {from:[7.803,48.618],to:[7.784,48.661],tonnage:90000,mode:"routier",label:"Distribution urbaine"},
+  {from:[7.762,48.527],to:[7.546,48.083],tonnage:60000,mode:"ferroviaire",label:"Retour wagons vides"}
+];
+
+var fluxColors = {fluvial:'#0078FF',ferroviaire:'#FF8C00',routier:'#64C864'};
+
+var energieData = {
+  producteurs:[
+    {coords:[7.762,48.528],nom:"Blue Paper",chaleur_mw:12,type:"Vapeur process",color:"#FF4444"},
+    {coords:[7.764,48.533],nom:"Lesaffre Panification",chaleur_mw:8,type:"Chaleur fermentation",color:"#FF6622"},
+    {coords:[7.758,48.524],nom:"Soprema",chaleur_mw:5,type:"Chaleur compression",color:"#FF8800"}
+  ],
+  consommateurs:[
+    {coords:[7.750,48.518],nom:"Quartier Neuhof",besoin_mw:9,type:"Chauffage urbain",color:"#2288FF"},
+    {coords:[7.770,48.535],nom:"Zone logistique Est",besoin_mw:6,type:"Chauffage entrepots",color:"#4499FF"}
+  ],
+  reseau:{type:"FeatureCollection",features:[
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.762,48.528],[7.756,48.525],[7.750,48.518]]},properties:{puissance_mw:12,statut:"existant"}},
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.764,48.533],[7.770,48.535]]},properties:{puissance_mw:8,statut:"projet"}},
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.758,48.524],[7.754,48.521],[7.750,48.518]]},properties:{puissance_mw:5,statut:"projet"}}
+  ]}
+};
+
+var facteursCO2 = {
+  route:{co2_par_tkm:0.062,cout_par_tkm:0.085,vitesse_moy:70},
+  ferroviaire:{co2_par_tkm:0.0028,cout_par_tkm:0.045,vitesse_moy:55},
+  fluvial:{co2_par_tkm:0.0031,cout_par_tkm:0.035,vitesse_moy:12}
+};
 
 var rhineCoords = [[7.53,48.05],[7.54,48.10],[7.546,48.083],[7.56,48.15],[7.60,48.20],[7.65,48.27],[7.70,48.32],[7.71,48.37],[7.73,48.42],[7.74,48.46],[7.76,48.50],[7.77,48.55],[7.78,48.58],[7.79,48.61],[7.79,48.64],[7.80,48.68],[7.82,48.71],[7.85,48.74],[7.90,48.78],[7.95,48.82],[8.00,48.86],[8.04,48.89],[8.08,48.92],[8.12,48.95],[8.18,48.98]];
 
@@ -657,6 +795,32 @@ map.on('load', function() {
       '#C2185B'],
     'circle-opacity':0.9,'circle-stroke-width':2,'circle-stroke-color':'rgba(255,255,255,0.5)'}});
   map.addLayer({id:'services-labels',type:'symbol',source:'services',minzoom:14,layout:{'text-field':['get','nom'],'text-font':['Open Sans Regular'],'text-size':9,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14},paint:{'text-color':'#444','text-halo-color':'#ffffff','text-halo-width':1.5}});
+
+  // ── THEMATIC: ITE & Quais ──
+  map.addSource('ite',{type:'geojson',data:iteData});
+  map.addLayer({id:'ite-active',type:'line',source:'ite',filter:['==',['get','actif'],true],layout:{visibility:'none'},paint:{'line-color':'#FF8C00','line-width':4,'line-dasharray':[2,2],'line-opacity':0.9}});
+  map.addLayer({id:'ite-inactive',type:'line',source:'ite',filter:['==',['get','actif'],false],layout:{visibility:'none'},paint:{'line-color':'#666666','line-width':2,'line-dasharray':[4,4],'line-opacity':0.6}});
+  map.addSource('quais',{type:'geojson',data:quaisData});
+
+  // ── THEMATIC: Flux de fret (animated lines via MapLibre) ──
+  var fluxGeoJSON = {type:'FeatureCollection',features:fluxFret.map(function(f,i){
+    return {type:'Feature',geometry:{type:'LineString',coordinates:[f.from,f.to]},properties:{mode:f.mode,tonnage:f.tonnage,label:f.label,idx:i}};
+  })};
+  map.addSource('flux',{type:'geojson',data:fluxGeoJSON});
+  map.addLayer({id:'flux-lines',type:'line',source:'flux',paint:{
+    'line-color':['match',['get','mode'],'fluvial','#0078FF','ferroviaire','#FF8C00','routier','#64C864','#999'],
+    'line-width':['interpolate',['linear'],['get','tonnage'],50000,2,300000,7],
+    'line-opacity':0.6,'line-dasharray':[2,3]
+  }});
+  map.addLayer({id:'flux-labels',type:'symbol',source:'flux',minzoom:10,layout:{
+    'symbol-placement':'line-center','text-field':['get','label'],'text-font':['Open Sans Regular'],
+    'text-size':9,'text-allow-overlap':false
+  },paint:{'text-color':'#555','text-halo-color':'#fff','text-halo-width':1.5}});
+
+  // ── THEMATIC: Energie R-PAS ──
+  map.addSource('energie-reseau',{type:'geojson',data:energieData.reseau});
+  map.addLayer({id:'energie-existant',type:'line',source:'energie-reseau',filter:['==',['get','statut'],'existant'],layout:{visibility:'none'},paint:{'line-color':'#FF4444','line-width':4,'line-opacity':0.8}});
+  map.addLayer({id:'energie-projet',type:'line',source:'energie-reseau',filter:['==',['get','statut'],'projet'],layout:{visibility:'none'},paint:{'line-color':'#FF4444','line-width':3,'line-dasharray':[4,4],'line-opacity':0.5}});
 
   // Infrastructure markers
   createInfraMarkers();
@@ -896,6 +1060,22 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
         map.setLayoutProperty('sectors-labels','visibility',active?'visible':'none');
       } else if(layer==='infra'){
         infraMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
+      } else if(layer==='ite'){
+        showIte = active;
+        map.setLayoutProperty('ite-active','visibility',active?'visible':'none');
+        map.setLayoutProperty('ite-inactive','visibility',active?'visible':'none');
+        quaiMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
+      } else if(layer==='flux'){
+        showFluxLayer = active;
+        map.setLayoutProperty('flux-lines','visibility',active?'visible':'none');
+        map.setLayoutProperty('flux-labels','visibility',active?'visible':'none');
+        document.getElementById('fluxLegend').style.display=active?'flex':'none';
+      } else if(layer==='energie'){
+        showEnergie = active;
+        map.setLayoutProperty('energie-existant','visibility',active?'visible':'none');
+        map.setLayoutProperty('energie-projet','visibility',active?'visible':'none');
+        energyMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
+        document.getElementById('energyCounter').classList.toggle('visible',active);
       } else if(layer==='buildings'){
         map.setPaintProperty('buildings-3d','fill-extrusion-opacity',active?0.75:0);
         // buildings-flat stays rendered (opacity 0) for queryRenderedFeatures
@@ -984,6 +1164,22 @@ function showCompanyDetail(p, clickLngLat) {
     if(p.tel) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f4de;</div><div class="detail-row-content"><div class="detail-row-label">Telephone</div><div class="detail-row-value">'+p.tel+'</div></div></div>';
     if(p.email) html += '<div class="detail-row"><div class="detail-row-icon">&#x2709;</div><div class="detail-row-content"><div class="detail-row-label">Email</div><div class="detail-row-value"><a href="mailto:'+p.email+'">'+p.email+'</a></div></div></div>';
     if(p.website) html += '<div class="detail-row"><div class="detail-row-icon">&#x1f310;</div><div class="detail-row-content"><div class="detail-row-label">Site web</div><div class="detail-row-value"><a href="'+p.website+'" target="_blank" rel="noopener">'+p.website.replace(/https?:\/\//,'').replace(/\/$/,'')+'</a></div></div></div>';
+    // Access multimodal badges
+    var hasITE = iteData.features.some(function(f){ return f.properties.entreprise && f.properties.entreprise.indexOf(p.nom)!==-1; });
+    var nearQuai = quaisData.features.some(function(q){ var c=q.geometry.coordinates; var dx=c[0]-(feat?feat.geometry.coordinates[0]:0); var dy=c[1]-(feat?feat.geometry.coordinates[1]:0); return Math.sqrt(dx*dx+dy*dy)<0.004; });
+    html += '<div style="margin:8px 0"><div class="detail-row-label" style="margin-bottom:6px">Acces multimodal</div><div style="display:flex;gap:4px;flex-wrap:wrap">';
+    html += '<span class="detail-flag '+(hasITE?'on':'off')+'">ITE Ferroviaire</span>';
+    html += '<span class="detail-flag '+(nearQuai?'on':'off')+'" style="'+(nearQuai?'background:rgba(0,100,255,0.12);color:#0066CC;border-color:rgba(0,100,255,0.2)':'')+'">Quai fluvial</span>';
+    html += '<span class="detail-flag on">Route</span>';
+    html += '</div></div>';
+    // Bilan carbone
+    var isProducer = energieData.producteurs.find(function(ep){ return p.nom && p.nom.indexOf(ep.nom)!==-1; });
+    if(isProducer){
+      html += '<div style="margin:8px 0;padding:8px;border-radius:6px;background:rgba(255,100,0,0.08);border:1px solid rgba(255,100,0,0.15);font-size:0.78rem;color:#FF8C00">\u26A1 Producteur chaleur fatale \u2014 '+isProducer.chaleur_mw+' MW</div>';
+    } else {
+      var eco = Math.round(1000 * 0.3 * 50 * (0.062 - 0.0028));
+      html += '<div style="margin:8px 0;padding:8px;border-radius:6px;background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.15);font-size:0.75rem;color:#27ae60">\u{1F33F} Report modal potentiel : ~'+eco+' kg CO\u2082/an evites (30% fret sur rail, 50 km)</div>';
+    }
     var flags = '';
     if(p.peps==='true'||p.peps===true) flags += '<span class="detail-flag on">PEPS</span>';
     else flags += '<span class="detail-flag off">PEPS</span>';
@@ -1223,7 +1419,9 @@ document.getElementById('modalSave').addEventListener('click', function(){
 
 });
 
-// Helper: update service/appontement display sources (excluding those placed on buildings)
+// Helper: update service/appontement display sources
+// Services placed on buildings (_onBuilding) are hidden as points
+// BUT their building stays colored and searchable
 function updateServiceSources(query) {
   var visible = servicesGeoJSON.features.filter(function(f){
     if (f.properties._onBuilding) return false;
@@ -1233,6 +1431,19 @@ function updateServiceSources(query) {
     }
     return true;
   });
+  // If searching, also include _onBuilding services in building layer results
+  if (query) {
+    var onBldg = servicesGeoJSON.features.filter(function(f){
+      return f.properties._onBuilding && (
+        f.properties.nom.toLowerCase().indexOf(query) !== -1 ||
+        (f.properties.type && f.properties.type.toLowerCase().indexOf(query) !== -1));
+    });
+    // Fly to the first matching on-building service
+    if (onBldg.length > 0 && visible.length === 0) {
+      var svc = onBldg[0];
+      map.flyTo({center:svc.geometry.coordinates, zoom:17, pitch:55, duration:1500});
+    }
+  }
   map.getSource('appontements').setData({type:'FeatureCollection', features: visible.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })});
   map.getSource('services').setData({type:'FeatureCollection', features: visible.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })});
 }
@@ -1428,6 +1639,182 @@ document.getElementById('exportBtn').addEventListener('click', function(){
     showToast('Donnees affichees dans la console (F12)');
   });
 });
+
+// ══════════════════════════════════════════
+// THEMATIC LAYER HANDLERS
+// ══════════════════════════════════════════
+var quaiMarkers = [];
+var energyMarkers = [];
+var showIte = false, showFluxLayer = true, showEnergie = false;
+
+// Create quai markers (hidden by default)
+quaisData.features.forEach(function(f){
+  var el = document.createElement('div');
+  el.className = 'quai-marker';
+  el.style.display = 'none';
+  el.addEventListener('click',function(e){
+    e.stopPropagation();
+    var p = f.properties;
+    var badge = p.statut==='operationnel' ? '<span style="color:#27ae60;background:rgba(39,174,96,0.12);padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600">Operationnel</span>' : '<span style="color:#FF8C00;background:rgba(255,140,0,0.12);padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600">Maintenance</span>';
+    var panel = document.getElementById('detailPanel');
+    document.getElementById('detailBar').style.background = 'linear-gradient(90deg,#003580,transparent)';
+    document.getElementById('detailName').textContent = p.nom;
+    document.getElementById('detailBadges').innerHTML = badge;
+    document.getElementById('detailBody').innerHTML =
+      '<div class="detail-row"><div class="detail-row-icon">\u2693</div><div class="detail-row-content"><div class="detail-row-label">Capacite</div><div class="detail-row-value">'+p.capacite+'</div></div></div>'+
+      '<div class="detail-row"><div class="detail-row-icon">\u{1F30A}</div><div class="detail-row-content"><div class="detail-row-label">Tirant d\'eau</div><div class="detail-row-value">'+p.tirant_eau+'</div></div></div>';
+    panel.classList.add('open');
+  });
+  var m = new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(f.geometry.coordinates).addTo(map);
+  quaiMarkers.push({marker:m,el:el});
+});
+
+// Create energy markers (hidden by default)
+energieData.producteurs.concat(energieData.consommateurs).forEach(function(p){
+  var isProducer = !!p.chaleur_mw;
+  var mw = p.chaleur_mw || p.besoin_mw;
+  var size = Math.max(16, mw * 3);
+  var el = document.createElement('div');
+  el.className = 'energy-dot';
+  el.style.display = 'none';
+  el.innerHTML = '<div class="energy-pulse" style="width:'+size+'px;height:'+size+'px;background:'+(isProducer?p.color:'#2288FF')+'"></div>'+
+    '<div class="energy-core" style="width:'+(size*0.5)+'px;height:'+(size*0.5)+'px;background:'+(isProducer?p.color:'#2288FF')+'"></div>';
+  var co2 = isProducer ? Math.round(mw * 433) : 0;
+  el.title = p.nom + ' \u2014 ' + mw + ' MW' + (co2 ? ' \u2014 ~'+co2.toLocaleString('fr-FR')+' t CO\u2082/an evitees' : '');
+  el.addEventListener('click',function(ev){
+    ev.stopPropagation();
+    var panel = document.getElementById('detailPanel');
+    document.getElementById('detailBar').style.background = 'linear-gradient(90deg,'+(isProducer?p.color:'#2288FF')+',transparent)';
+    document.getElementById('detailName').textContent = p.nom;
+    document.getElementById('detailBadges').innerHTML = '<span class="detail-badge" style="color:'+(isProducer?'#FF6622':'#2288FF')+';border-color:currentColor;background:rgba('+(isProducer?'255,100,34':'34,136,255')+',0.1)">'+(isProducer?'Producteur':'Consommateur')+' \u2014 '+mw+' MW</span>';
+    document.getElementById('detailBody').innerHTML =
+      '<div class="detail-row"><div class="detail-row-icon">\u26A1</div><div class="detail-row-content"><div class="detail-row-label">Type</div><div class="detail-row-value">'+p.type+'</div></div></div>'+
+      (co2?'<div class="detail-row"><div class="detail-row-icon">\u{1F33F}</div><div class="detail-row-content"><div class="detail-row-label">CO\u2082 evite</div><div class="detail-row-value">~'+co2.toLocaleString('fr-FR')+' t/an</div></div></div>':'');
+    panel.classList.add('open');
+  });
+  var m = new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(p.coords).addTo(map);
+  energyMarkers.push({marker:m,el:el});
+});
+
+// ITE click handler
+map.on('click','ite-active',function(e){
+  if(!e.features||!e.features.length) return;
+  var p = e.features[0].properties;
+  var panel = document.getElementById('detailPanel');
+  document.getElementById('detailBar').style.background = 'linear-gradient(90deg,#FF8C00,transparent)';
+  document.getElementById('detailName').textContent = p.nom;
+  document.getElementById('detailBadges').innerHTML = '<span class="detail-badge" style="color:#FF8C00;border-color:rgba(255,140,0,0.3);background:rgba(255,140,0,0.1)">\u{1F682} ITE Active</span>';
+  document.getElementById('detailBody').innerHTML =
+    '<div class="detail-row"><div class="detail-row-icon">\u{1F3ED}</div><div class="detail-row-content"><div class="detail-row-label">Entreprise</div><div class="detail-row-value">'+p.entreprise+'</div></div></div>'+
+    '<div class="detail-row"><div class="detail-row-icon">\u{1F4CF}</div><div class="detail-row-content"><div class="detail-row-label">Longueur</div><div class="detail-row-value">'+p.longueur+'</div></div></div>';
+  panel.classList.add('open');
+});
+map.on('click','ite-inactive',function(e){
+  if(!e.features||!e.features.length) return;
+  var p = e.features[0].properties;
+  var panel = document.getElementById('detailPanel');
+  document.getElementById('detailBar').style.background = 'linear-gradient(90deg,#666,transparent)';
+  document.getElementById('detailName').textContent = p.nom;
+  document.getElementById('detailBadges').innerHTML = '<span class="detail-badge" style="color:#888;border-color:var(--glass-border)">\u{1F682} ITE Inactive</span>';
+  document.getElementById('detailBody').innerHTML =
+    '<div class="detail-row"><div class="detail-row-icon">\u{1F3ED}</div><div class="detail-row-content"><div class="detail-row-label">Entreprise</div><div class="detail-row-value">'+p.entreprise+'</div></div></div>'+
+    '<div class="detail-row"><div class="detail-row-icon">\u{1F4CF}</div><div class="detail-row-content"><div class="detail-row-label">Longueur</div><div class="detail-row-value">'+p.longueur+'</div></div></div>';
+  panel.classList.add('open');
+});
+['ite-active','ite-inactive'].forEach(function(id){
+  map.on('mouseenter',id,function(){map.getCanvas().style.cursor='pointer';});
+  map.on('mouseleave',id,function(){map.getCanvas().style.cursor='';});
+});
+
+// Flux click
+map.on('click','flux-lines',function(e){
+  if(!e.features||!e.features.length) return;
+  var p = e.features[0].properties;
+  var panel = document.getElementById('detailPanel');
+  document.getElementById('detailBar').style.background = 'linear-gradient(90deg,'+(fluxColors[p.mode]||'#999')+',transparent)';
+  document.getElementById('detailName').textContent = p.label;
+  document.getElementById('detailBadges').innerHTML = '<span class="detail-badge" style="color:'+(fluxColors[p.mode]||'#999')+';border-color:currentColor;background:rgba(255,255,255,0.05)">'+p.mode+'</span>';
+  document.getElementById('detailBody').innerHTML =
+    '<div class="detail-row"><div class="detail-row-icon">\u{1F4E6}</div><div class="detail-row-content"><div class="detail-row-label">Tonnage</div><div class="detail-row-value">'+(p.tonnage/1000)+' kt/an</div></div></div>';
+  panel.classList.add('open');
+});
+map.on('mouseenter','flux-lines',function(){map.getCanvas().style.cursor='pointer';});
+map.on('mouseleave','flux-lines',function(){map.getCanvas().style.cursor='';});
+
+// Flux dash animation
+var fluxDashStep = 0;
+function animateFlux(){
+  fluxDashStep = (fluxDashStep + 0.15) % 4;
+  if(map.getLayer('flux-lines') && showFluxLayer){
+    map.setPaintProperty('flux-lines','line-dasharray',[2, fluxDashStep + 1]);
+  }
+  requestAnimationFrame(animateFlux);
+}
+animateFlux();
+
+// ITE dash animation
+var iteDashStep = 0;
+function animateIte(){
+  iteDashStep = (iteDashStep + 0.1) % 4;
+  if(map.getLayer('ite-active') && showIte){
+    map.setPaintProperty('ite-active','line-dasharray',[2, iteDashStep + 1]);
+  }
+  requestAnimationFrame(animateIte);
+}
+animateIte();
+
+// ══════════════════════════════════════════
+// COMPARATOR CO2
+// ══════════════════════════════════════════
+document.getElementById('compBtn').addEventListener('click',function(){
+  document.getElementById('compOverlay').classList.add('open');
+  runComparator();
+});
+document.getElementById('compClose').addEventListener('click',function(){
+  document.getElementById('compOverlay').classList.remove('open');
+});
+document.getElementById('compOverlay').addEventListener('click',function(e){
+  if(e.target===this) this.classList.remove('open');
+});
+
+var compTonnage = document.getElementById('compTonnage');
+var compDist = document.getElementById('compDist');
+compTonnage.addEventListener('input',function(){ document.getElementById('compTonnageVal').textContent=this.value+' t'; runComparator(); });
+compDist.addEventListener('input',function(){ document.getElementById('compDistVal').textContent=this.value+' km'; runComparator(); });
+
+function runComparator(){
+  var t = parseInt(compTonnage.value);
+  var d = parseInt(compDist.value);
+  var results = {};
+  var maxCO2 = 0;
+  ['route','ferroviaire','fluvial'].forEach(function(mode){
+    var f = facteursCO2[mode];
+    var co2 = Math.round(t * d * f.co2_par_tkm);
+    var cout = Math.round(t * d * f.cout_par_tkm);
+    var temps = (d / f.vitesse_moy).toFixed(1);
+    results[mode] = {co2:co2,cout:cout,temps:temps};
+    if(co2>maxCO2) maxCO2=co2;
+  });
+  var icons = {route:'\u{1F69B}',ferroviaire:'\u{1F682}',fluvial:'\u{1F6A2}'};
+  var labels = {route:'Route',ferroviaire:'Ferroviaire',fluvial:'Fluvial'};
+  var html = '';
+  ['route','ferroviaire','fluvial'].forEach(function(mode){
+    var r = results[mode];
+    var pct = maxCO2>0 ? (r.co2/maxCO2*100) : 0;
+    var cls = mode==='route'?'high':(r.co2<results.route.co2*0.1?'low':'mid');
+    var saving = mode!=='route' ? Math.round((1 - r.co2/results.route.co2)*100) : 0;
+    html += '<div class="comp-card">';
+    html += '<div class="comp-card-icon">'+icons[mode]+'</div>';
+    html += '<div class="comp-card-mode">'+labels[mode]+'</div>';
+    html += '<div class="comp-co2 '+cls+'">'+r.co2.toLocaleString('fr-FR')+' kg</div>';
+    html += '<div class="comp-detail">CO\u2082 emis</div>';
+    html += '<div class="comp-detail">'+r.cout.toLocaleString('fr-FR')+' \u20ac · '+r.temps+' h</div>';
+    html += '<div class="comp-bar" style="width:'+pct+'%;background:'+(cls==='high'?'#e74c3c':cls==='low'?'#27ae60':'#f39c12')+'"></div>';
+    if(mode!=='route'&&saving>0) html += '<div class="comp-saving">\u2212 '+saving+'% CO\u2082 vs route</div>';
+    html += '</div>';
+  });
+  document.getElementById('compResults').innerHTML = html;
+}
 
 // Watermark
 (function(){var w=document.createElement('div');w.style.cssText='position:fixed;bottom:24px;right:20px;z-index:50;font-size:0.65rem;color:rgba(255,255,255,0.2);font-family:Inter,sans-serif;pointer-events:none;';w.textContent='Demo \u2014 French4 Dev \u2014 jean-charles@french4.dev';document.body.appendChild(w);})();
