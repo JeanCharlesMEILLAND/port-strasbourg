@@ -152,13 +152,20 @@ function findNearestBuilding(point, buildings, maxDist) {
   return best;
 }
 
-// Simplify polygon coordinates to reduce file size
-function simplifyCoords(coords, tolerance) {
-  if (coords.length <= 4) return coords;
-  // Douglas-Peucker simplified: just round to 6 decimal places
+// Round coordinates + buffer outward slightly (~2m) to fully cover the visual building
+function simplifyCoords(coords) {
+  if (coords.length <= 2) return coords.map(c => [Math.round(c[0]*1000000)/1000000, Math.round(c[1]*1000000)/1000000]);
+
+  // Compute centroid
+  let cx = 0, cy = 0;
+  for (const c of coords) { cx += c[0]; cy += c[1]; }
+  cx /= coords.length; cy /= coords.length;
+
+  // Expand each point slightly away from centroid (buffer ~2-3m)
+  const buf = 1.03; // 3% expansion
   return coords.map(c => [
-    Math.round(c[0] * 1000000) / 1000000,
-    Math.round(c[1] * 1000000) / 1000000
+    Math.round((cx + (c[0] - cx) * buf) * 1000000) / 1000000,
+    Math.round((cy + (c[1] - cy) * buf) * 1000000) / 1000000
   ]);
 }
 

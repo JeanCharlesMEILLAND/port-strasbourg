@@ -564,7 +564,7 @@ rebuildCompanyBuildings = function() {
 };
 function invalidateBuildingsCache() { _buildingsCacheDirty = true; }
 
-var map = new maplibregl.Map({container:'map',style:mapStyle,center:[7.78,48.56],zoom:9,pitch:45,bearing:-15,antialias:true,maxPitch:70});
+var map = new maplibregl.Map({container:'map',style:mapStyle,center:[7.788,48.545],zoom:15.5,pitch:55,bearing:-20,antialias:true,maxPitch:70});
 map.addControl(new maplibregl.NavigationControl({showCompass:true,showZoom:true,visualizePitch:true}),'top-right');
 
 map.on('load', function() {
@@ -606,9 +606,9 @@ map.on('load', function() {
   map.addSource('company-buildings',{type:'geojson',data:rebuildCompanyBuildings()});
   map.addLayer({id:'company-buildings-3d',type:'fill-extrusion',source:'company-buildings',minzoom:13,paint:{
     'fill-extrusion-color':colorMatch,
-    'fill-extrusion-height':['coalesce',['get','_height'],10],
+    'fill-extrusion-height':['+',['coalesce',['get','_height'],10],1],
     'fill-extrusion-base':0,
-    'fill-extrusion-opacity':0.92
+    'fill-extrusion-opacity':1
   }});
   map.addLayer({id:'company-buildings-outline',type:'line',source:'company-buildings',minzoom:14,paint:{
     'line-color':['case',['>=',['coalesce',['get','_occupants'],1],2],'#FFD700',colorMatch],
