@@ -734,8 +734,8 @@ map.on('load', function() {
   var buildingColorExpr = ['case',['has','_serviceColor'],['get','_serviceColor'],colorMatch];
   map.addLayer({id:'company-buildings-3d',type:'fill-extrusion',source:'company-buildings',minzoom:13,paint:{
     'fill-extrusion-color':buildingColorExpr,
-    'fill-extrusion-height':['+',['coalesce',['get','_height'],10],1],
-    'fill-extrusion-base':0,
+    'fill-extrusion-height':['+',['coalesce',['get','_height'],10],2],
+    'fill-extrusion-base':0.5,
     'fill-extrusion-opacity':1
   }});
   map.addLayer({id:'company-buildings-outline',type:'line',source:'company-buildings',minzoom:14,paint:{
@@ -1041,7 +1041,7 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
         energyMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
         document.getElementById('energyCounter').classList.toggle('visible',active);
       } else if(layer==='buildings'){
-        map.setPaintProperty('buildings-3d','fill-extrusion-opacity',active?0.75:0);
+        map.setPaintProperty('buildings-3d','fill-extrusion-opacity',active?0.3:0);
         // buildings-flat stays rendered (opacity 0) for queryRenderedFeatures
         map.setPaintProperty('buildings-flat','fill-opacity',active?0.6:0.01);
       }
