@@ -302,7 +302,8 @@ body {
   <div class="sidebar-section">
     <div class="sidebar-section-title">Couches</div>
     <div class="toggle-row active" data-layer="entreprises"><span class="toggle-label">Entreprises (280)</span><div class="toggle-switch"></div></div>
-    <div class="toggle-row active" data-layer="services"><span class="toggle-label">Services (35)</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row active" data-layer="appontements"><span class="toggle-label">Appontements (16)</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row active" data-layer="services"><span class="toggle-label">Services (19)</span><div class="toggle-switch"></div></div>
     <div class="toggle-row" data-layer="secteurs"><span class="toggle-label">Zones secteurs</span><div class="toggle-switch"></div></div>
     <div class="toggle-row active" data-layer="infra"><span class="toggle-label">Infrastructure</span><div class="toggle-switch"></div></div>
     <div class="toggle-row" data-layer="buildings"><span class="toggle-label">Batiments 3D (IGN)</span><div class="toggle-switch"></div></div>
@@ -608,28 +609,52 @@ map.on('load', function() {
 
   // Companies — 3D buildings (pre-computed from IGN BD TOPO)
   map.addSource('company-buildings',{type:'geojson',data:rebuildCompanyBuildings()});
+  // Color: use _serviceColor if present, otherwise domain color
+  var buildingColorExpr = ['case',['has','_serviceColor'],['get','_serviceColor'],colorMatch];
   map.addLayer({id:'company-buildings-3d',type:'fill-extrusion',source:'company-buildings',minzoom:13,paint:{
-    'fill-extrusion-color':colorMatch,
+    'fill-extrusion-color':buildingColorExpr,
     'fill-extrusion-height':['+',['coalesce',['get','_height'],10],1],
     'fill-extrusion-base':0,
     'fill-extrusion-opacity':1
   }});
   map.addLayer({id:'company-buildings-outline',type:'line',source:'company-buildings',minzoom:14,paint:{
-    'line-color':['case',['>=',['coalesce',['get','_occupants'],1],2],'#FFD700',colorMatch],
+    'line-color':['case',['>=',['coalesce',['get','_occupants'],1],2],'#FFD700',buildingColorExpr],
     'line-width':['case',['>=',['coalesce',['get','_occupants'],1],2],3,1.5],
     'line-opacity':['case',['>=',['coalesce',['get','_occupants'],1],2],0.9,0.6]
   }});
   map.addLayer({id:'companies-labels',type:'symbol',source:'companies',minzoom:15,layout:{'text-field':['get','nom'],'text-font':['Open Sans Regular'],'text-size':10,'text-offset':[0,0],'text-anchor':'center','text-max-width':10,'text-allow-overlap':false},paint:{'text-color':'#ffffff','text-halo-color':'rgba(0,0,0,0.7)','text-halo-width':1.5}});
 
-  // Services
-  map.addSource('services',{type:'geojson',data:servicesGeoJSON});
-  map.addLayer({id:'services-circles',type:'circle',source:'services',paint:{
-    'circle-radius':['interpolate',['linear'],['zoom'],8,4,14,7,17,10],
+  // Split services: appontements vs other services
+  var appontementsGeoJSON = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){
+    return f.properties.type && f.properties.type.indexOf('appontement') !== -1;
+  })};
+  var otherServicesGeoJSON = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){
+    return !f.properties.type || f.properties.type.indexOf('appontement') === -1;
+  })};
+
+  // Appontements — dedicated layer with anchor icons
+  map.addSource('appontements',{type:'geojson',data:appontementsGeoJSON});
+  map.addLayer({id:'appontements-circles',type:'circle',source:'appontements',paint:{
+    'circle-radius':['interpolate',['linear'],['zoom'],10,5,14,9,17,12],
     'circle-color':['match',['get','type'],
-      'appontements croisières','#2196F3','appontements mixtes','#00BCD4','appontements mariniers','#009688',
-      'restauration','#FF5722','hôtel','#9C27B0','stations-services','#FF9800',
-      'parking PL','#607D8B','points d\'intérêt','#4CAF50','espace de gestion des déchets','#8BC34A',
-      '#E91E63'],
+      'appontements croisières','#1565C0',
+      'appontements mixtes','#00838F',
+      'appontements mariniers','#00695C',
+      '#1565C0'],
+    'circle-opacity':0.9,'circle-stroke-width':2.5,'circle-stroke-color':'rgba(255,255,255,0.7)'}});
+  map.addLayer({id:'appontements-labels',type:'symbol',source:'appontements',minzoom:13,layout:{
+    'text-field':['get','nom'],'text-font':['Open Sans Bold'],'text-size':10,
+    'text-offset':[0,1.6],'text-anchor':'top','text-max-width':14
+  },paint:{'text-color':'#0D47A1','text-halo-color':'#ffffff','text-halo-width':2}});
+
+  // Other services (restaurants, stations, etc.)
+  map.addSource('services',{type:'geojson',data:otherServicesGeoJSON});
+  map.addLayer({id:'services-circles',type:'circle',source:'services',paint:{
+    'circle-radius':['interpolate',['linear'],['zoom'],8,4,14,6,17,9],
+    'circle-color':['match',['get','type'],
+      'restauration','#E64A19','hôtel','#7B1FA2','stations-services','#F57C00',
+      'parking PL','#455A64','points d\'intérêt','#2E7D32','espace de gestion des déchets','#558B2F',
+      '#C2185B'],
     'circle-opacity':0.9,'circle-stroke-width':2,'circle-stroke-color':'rgba(255,255,255,0.5)'}});
   map.addLayer({id:'services-labels',type:'symbol',source:'services',minzoom:14,layout:{'text-field':['get','nom'],'text-font':['Open Sans Regular'],'text-size':9,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14},paint:{'text-color':'#444','text-halo-color':'#ffffff','text-halo-width':1.5}});
 
@@ -651,8 +676,14 @@ map.on('load', function() {
     if(!e.features||!e.features.length) return;
     showServiceDetail(e.features[0].properties);
   });
+  map.on('click','appontements-circles',function(e){
+    if(!e.features||!e.features.length) return;
+    showServiceDetail(e.features[0].properties);
+  });
   map.on('mouseenter','services-circles',function(){map.getCanvas().style.cursor='pointer';});
   map.on('mouseleave','services-circles',function(){map.getCanvas().style.cursor='';});
+  map.on('mouseenter','appontements-circles',function(){map.getCanvas().style.cursor='pointer';});
+  map.on('mouseleave','appontements-circles',function(){map.getCanvas().style.cursor='';});
 
   // Loading
   setTimeout(function(){document.getElementById('loading').classList.add('hidden');},600);
@@ -709,15 +740,17 @@ function applyFilters() {
   var filteredBldg = {type:'FeatureCollection', features: allBuildings.features.filter(function(f){ return matchesFilters(f.properties); })};
   map.getSource('company-buildings').setData(filteredBldg);
 
-  // Filter services too (by search query)
+  // Filter services + appontements (by search query)
   if (searchQuery) {
-    var filteredSvc = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){
+    var matchingSvc = servicesGeoJSON.features.filter(function(f){
       return f.properties.nom.toLowerCase().indexOf(searchQuery) !== -1 ||
         (f.properties.type && f.properties.type.toLowerCase().indexOf(searchQuery) !== -1);
-    })};
-    map.getSource('services').setData(filteredSvc);
+    });
+    map.getSource('appontements').setData({type:'FeatureCollection', features: matchingSvc.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })});
+    map.getSource('services').setData({type:'FeatureCollection', features: matchingSvc.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })});
   } else {
-    map.getSource('services').setData(servicesGeoJSON);
+    map.getSource('appontements').setData({type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })});
+    map.getSource('services').setData({type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })});
   }
 
   // Clear layer filters (we filter at source level now)
@@ -815,6 +848,9 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
         ['companies-circles','companies-circles-hi','companies-labels','company-buildings-3d','company-buildings-outline'].forEach(function(id){
           map.setLayoutProperty(id,'visibility',active?'visible':'none');
         });
+      } else if(layer==='appontements'){
+        map.setLayoutProperty('appontements-circles','visibility',active?'visible':'none');
+        map.setLayoutProperty('appontements-labels','visibility',active?'visible':'none');
       } else if(layer==='services'){
         map.setLayoutProperty('services-circles','visibility',active?'visible':'none');
         map.setLayoutProperty('services-labels','visibility',active?'visible':'none');
@@ -1166,16 +1202,18 @@ var dragType = null; // 'company' or 'service'
   });
 });
 
-// Mousedown on service circle
-map.on('mousedown', 'services-circles', function(e){
-  if (!editMode || !e.features || !e.features.length) return;
-  e.preventDefault();
-  isDragging = true;
-  dragType = 'service';
-  dragFeatureId = e.features[0].properties.id;
-  map.getCanvas().style.cursor = 'grabbing';
-  map.dragPan.disable();
-  map.dragRotate.disable();
+// Mousedown on service or appontement circle
+['services-circles','appontements-circles'].forEach(function(layerId){
+  map.on('mousedown', layerId, function(e){
+    if (!editMode || !e.features || !e.features.length) return;
+    e.preventDefault();
+    isDragging = true;
+    dragType = 'service';
+    dragFeatureId = e.features[0].properties.id;
+    map.getCanvas().style.cursor = 'grabbing';
+    map.dragPan.disable();
+    map.dragRotate.disable();
+  });
 });
 
 // Mousemove — update point position during drag
@@ -1201,7 +1239,11 @@ map.on('mousemove', function(e){
         break;
       }
     }
-    map.getSource('services').setData(servicesGeoJSON);
+    // Update both sources (feature could be in either)
+    var appData = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })};
+    var svcData = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })};
+    map.getSource('appontements').setData(appData);
+    map.getSource('services').setData(svcData);
   }
 });
 
@@ -1249,11 +1291,50 @@ map.on('mouseup', function(e){
 
     } else if (dragType === 'service') {
       var feat = servicesGeoJSON.features.find(function(f){ return f.properties.id == dragFeatureId; });
-      if (feat) {
-        var c = feat.geometry.coordinates;
-        showToast(feat.properties.nom + ' \u2014 deplac\u00e9 (' + c[1].toFixed(5) + ', ' + c[0].toFixed(5) + ')');
+
+      // Try to snap to IGN building and color it
+      var pixel = e.point || map.project(e.lngLat);
+      var bldgHits = map.queryRenderedFeatures(
+        [[pixel.x-25, pixel.y-25],[pixel.x+25, pixel.y+25]],
+        {layers:['buildings-flat']}
+      );
+
+      if (bldgHits.length > 0 && feat) {
+        var bldg = bldgHits[0];
+        // Map service type to color
+        var svcColors = {
+          'appontements croisières':'#1565C0','appontements mixtes':'#00838F','appontements mariniers':'#00695C',
+          'restauration':'#E64A19','hôtel':'#7B1FA2','stations-services':'#F57C00',
+          'parking PL':'#455A64','points d\'intérêt':'#2E7D32','espace de gestion des déchets':'#558B2F'
+        };
+        var svcColor = svcColors[feat.properties.type] || '#C2185B';
+        var props = {
+          id: 'svc_' + feat.properties.id,
+          nom: feat.properties.nom,
+          domaine: feat.properties.type || 'Service',
+          _height: bldg.properties.hauteur || 8,
+          _occupants: 1,
+          _serviceColor: svcColor
+        };
+        // Add to matchedBuildingsGeoJSON so the building stays colored
+        if (typeof matchedBuildingsGeoJSON !== 'undefined') {
+          matchedBuildingsGeoJSON.features = matchedBuildingsGeoJSON.features.filter(function(f){
+            return f.properties.id != 'svc_' + dragFeatureId;
+          });
+          matchedBuildingsGeoJSON.features.push({type:'Feature', geometry:bldg.geometry, properties:props});
+          invalidateBuildingsCache();
+          map.getSource('company-buildings').setData(rebuildCompanyBuildings());
+        }
+        showToast(feat.properties.nom + ' \u2014 place sur batiment');
+      } else if (feat) {
+        showToast(feat.properties.nom + ' \u2014 deplac\u00e9');
       }
-      map.getSource('services').setData(servicesGeoJSON);
+
+      // Update service sources
+      var appData = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })};
+      var svcData = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })};
+      map.getSource('appontements').setData(appData);
+      map.getSource('services').setData(svcData);
     }
 
     document.getElementById('exportBtn').classList.add('visible');
