@@ -569,7 +569,7 @@ rebuildCompanyBuildings = function() {
 };
 function invalidateBuildingsCache() { _buildingsCacheDirty = true; }
 
-var map = new maplibregl.Map({container:'map',style:mapStyle,center:[7.788,48.545],zoom:15.5,pitch:55,bearing:-20,antialias:true,maxPitch:70});
+var map = new maplibregl.Map({container:'map',style:mapStyle,center:[7.790,48.565],zoom:14.5,pitch:50,bearing:-15,antialias:true,maxPitch:70});
 map.addControl(new maplibregl.NavigationControl({showCompass:true,showZoom:true,visualizePitch:true}),'top-right');
 
 map.on('load', function() {
@@ -635,14 +635,14 @@ map.on('load', function() {
   // Appontements — dedicated layer with anchor icons
   map.addSource('appontements',{type:'geojson',data:appontementsGeoJSON});
   map.addLayer({id:'appontements-circles',type:'circle',source:'appontements',paint:{
-    'circle-radius':['interpolate',['linear'],['zoom'],10,5,14,9,17,12],
+    'circle-radius':['interpolate',['linear'],['zoom'],10,6,14,10,17,14],
     'circle-color':['match',['get','type'],
-      'appontements croisières','#1565C0',
-      'appontements mixtes','#00838F',
-      'appontements mariniers','#00695C',
-      '#1565C0'],
-    'circle-opacity':0.9,'circle-stroke-width':2.5,'circle-stroke-color':'rgba(255,255,255,0.7)'}});
-  map.addLayer({id:'appontements-labels',type:'symbol',source:'appontements',minzoom:13,layout:{
+      'appontements croisières','#0D47A1',
+      'appontements mixtes','#006064',
+      'appontements mariniers','#004D40',
+      '#0D47A1'],
+    'circle-opacity':0.95,'circle-stroke-width':3,'circle-stroke-color':'#ffffff'}});
+  map.addLayer({id:'appontements-labels',type:'symbol',source:'appontements',minzoom:14,layout:{
     'text-field':['get','nom'],'text-font':['Open Sans Bold'],'text-size':10,
     'text-offset':[0,1.6],'text-anchor':'top','text-max-width':14
   },paint:{'text-color':'#0D47A1','text-halo-color':'#ffffff','text-halo-width':2}});
