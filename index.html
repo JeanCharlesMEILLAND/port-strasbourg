@@ -136,6 +136,14 @@ body {
 .sector-chip:hover { border-color:var(--glass-border-hover); }
 .sector-chip.active { background:rgba(0,153,255,0.15); border-color:var(--blue-accent); color:var(--blue-accent); }
 
+/* Accordion */
+.accordion-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:6px 0; }
+.accordion-header:hover .sidebar-section-title { color:var(--text-primary); }
+.accordion-arrow { font-size:0.6rem; color:var(--text-muted); transition:transform 0.25s ease; }
+.accordion-header.open .accordion-arrow { transform:rotate(90deg); }
+.accordion-body { max-height:0; overflow:hidden; transition:max-height 0.3s ease; }
+.accordion-body.open { max-height:200px; }
+
 .sidebar-counter { text-align:center; padding:10px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.03); border:1px solid var(--glass-border); font-size:0.8rem; color:var(--text-muted); margin-top:12px; }
 .sidebar-counter strong { color:var(--blue-accent); font-size:1.05rem; }
 
@@ -370,13 +378,23 @@ body {
   </div>
 
   <div class="sidebar-section">
-    <div class="sidebar-section-title">Activite</div>
-    <div class="filter-chips" id="domainFilters"></div>
+    <div class="accordion-header" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+      <div class="sidebar-section-title" style="margin-bottom:0">Activite</div>
+      <span class="accordion-arrow">&#x25B6;</span>
+    </div>
+    <div class="accordion-body">
+      <div class="filter-chips" id="domainFilters" style="padding:8px 0"></div>
+    </div>
   </div>
 
   <div class="sidebar-section">
-    <div class="sidebar-section-title">Secteur portuaire</div>
-    <div class="sector-chips" id="sectorFilters"></div>
+    <div class="accordion-header" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+      <div class="sidebar-section-title" style="margin-bottom:0">Secteur portuaire</div>
+      <span class="accordion-arrow">&#x25B6;</span>
+    </div>
+    <div class="accordion-body">
+      <div class="sector-chips" id="sectorFilters" style="padding:8px 0"></div>
+    </div>
   </div>
 
   <button class="edit-toggle" id="editToggle">
