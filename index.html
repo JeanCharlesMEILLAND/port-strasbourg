@@ -528,7 +528,7 @@ var domainConfig = {
   "ADMINISTRATIONS et ORGANISMES D'INTERET GENERAL":  {short:'Admin',       color:'#888899'}
 };
 
-var sectorColorMap = {A:'#FF6B6B',B:'#4ECDC4',C:'#45B7D1',D:'#96CEB4',E:'#F7DC6F',F:'#DDA0DD',G:'#98D8C8',H:'#E8A87C',I:'#BB8FCE'};
+var sectorColorMap = {A:'#E53935',B:'#00897B',C:'#1E88E5',D:'#43A047',E:'#FDD835',F:'#8E24AA',G:'#00ACC1',H:'#FB8C00',I:'#5E35B1'};
 
 // Build MapLibre match expression for circle colors
 var colorMatch = ['match',['get','domaine']];
@@ -722,9 +722,9 @@ map.on('load', function() {
   var sectorMatch = ['match',['get','secteur']];
   Object.entries(sectorColorMap).forEach(function(e){sectorMatch.push(e[0],e[1]);});
   sectorMatch.push('#333');
-  map.addLayer({id:'sectors-fill',type:'fill',source:'sectors',layout:{visibility:'none'},paint:{'fill-color':sectorMatch,'fill-opacity':0.25}});
-  map.addLayer({id:'sectors-outline',type:'line',source:'sectors',layout:{visibility:'none'},paint:{'line-color':sectorMatch,'line-width':3,'line-opacity':0.8}});
-  map.addLayer({id:'sectors-labels',type:'symbol',source:'sectors',layout:{visibility:'none','text-field':['concat','Secteur ',['get','secteur']],'text-font':['Open Sans Bold'],'text-size':18,'text-allow-overlap':true},paint:{'text-color':'rgba(0,0,0,0.7)','text-halo-color':'#ffffff','text-halo-width':2.5}});
+  map.addLayer({id:'sectors-fill',type:'fill',source:'sectors',layout:{visibility:'none'},paint:{'fill-color':sectorMatch,'fill-opacity':0.35,'fill-antialias':true}});
+  map.addLayer({id:'sectors-outline',type:'line',source:'sectors',layout:{visibility:'none'},paint:{'line-color':sectorMatch,'line-width':4,'line-opacity':0.9}});
+  map.addLayer({id:'sectors-labels',type:'symbol',source:'sectors',layout:{visibility:'none','text-field':['get','secteur'],'text-font':['Open Sans Bold'],'text-size':['interpolate',['linear'],['zoom'],12,16,16,28],'text-allow-overlap':true},paint:{'text-color':'rgba(255,255,255,0.9)','text-halo-color':sectorMatch,'text-halo-width':3}});
 
   // Companies — point source
   map.addSource('companies',{type:'geojson',data:companiesGeoJSON});
@@ -1050,15 +1050,6 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
         map.setLayoutProperty('sectors-fill','visibility',active?'visible':'none');
         map.setLayoutProperty('sectors-outline','visibility',active?'visible':'none');
         map.setLayoutProperty('sectors-labels','visibility',active?'visible':'none');
-        if(active){
-          // Fit to show all sectors
-          var bounds = new maplibregl.LngLatBounds();
-          sectorsGeoJSON.features.forEach(function(f){
-            var coords = f.geometry.type==='MultiPolygon' ? f.geometry.coordinates[0][0] : f.geometry.coordinates[0];
-            coords.forEach(function(c){bounds.extend(c);});
-          });
-          map.fitBounds(bounds,{padding:60,maxZoom:15,duration:1200});
-        }
       } else if(layer==='infra'){
         infraMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
         if(active){
