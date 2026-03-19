@@ -666,7 +666,13 @@ map.on('load', function() {
   companyLayers.forEach(function(layerId){
     map.on('click',layerId,function(e){
       if(editMode || !e.features||!e.features.length) return;
-      showCompanyDetail(e.features[0].properties);
+      var p = e.features[0].properties;
+      // Check if this is a service placed on a building
+      if (p._serviceColor || (p.id && String(p.id).indexOf('svc_') === 0)) {
+        showServiceDetail(p);
+      } else {
+        showCompanyDetail(p);
+      }
       map.easeTo({center:e.lngLat,duration:600});
     });
     map.on('mouseenter',layerId,function(){if(!editMode) map.getCanvas().style.cursor='pointer';});
@@ -740,18 +746,8 @@ function applyFilters() {
   var filteredBldg = {type:'FeatureCollection', features: allBuildings.features.filter(function(f){ return matchesFilters(f.properties); })};
   map.getSource('company-buildings').setData(filteredBldg);
 
-  // Filter services + appontements (by search query)
-  if (searchQuery) {
-    var matchingSvc = servicesGeoJSON.features.filter(function(f){
-      return f.properties.nom.toLowerCase().indexOf(searchQuery) !== -1 ||
-        (f.properties.type && f.properties.type.toLowerCase().indexOf(searchQuery) !== -1);
-    });
-    map.getSource('appontements').setData({type:'FeatureCollection', features: matchingSvc.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })});
-    map.getSource('services').setData({type:'FeatureCollection', features: matchingSvc.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })});
-  } else {
-    map.getSource('appontements').setData({type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })});
-    map.getSource('services').setData({type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })});
-  }
+  // Filter services + appontements (by search query, excluding those on buildings)
+  updateServiceSources(searchQuery || null);
 
   // Clear layer filters (we filter at source level now)
   ['companies-circles','companies-circles-hi','companies-labels','company-buildings-3d','company-buildings-outline'].forEach(function(id){
@@ -1227,6 +1223,20 @@ document.getElementById('modalSave').addEventListener('click', function(){
 
 });
 
+// Helper: update service/appontement display sources (excluding those placed on buildings)
+function updateServiceSources(query) {
+  var visible = servicesGeoJSON.features.filter(function(f){
+    if (f.properties._onBuilding) return false;
+    if (query) {
+      return f.properties.nom.toLowerCase().indexOf(query) !== -1 ||
+        (f.properties.type && f.properties.type.toLowerCase().indexOf(query) !== -1);
+    }
+    return true;
+  });
+  map.getSource('appontements').setData({type:'FeatureCollection', features: visible.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })});
+  map.getSource('services').setData({type:'FeatureCollection', features: visible.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })});
+}
+
 // Mousedown on company circle OR 3D building
 var dragType = null; // 'company' or 'service'
 ['companies-circles','companies-circles-hi','company-buildings-3d'].forEach(function(layerId){
@@ -1279,11 +1289,7 @@ map.on('mousemove', function(e){
         break;
       }
     }
-    // Update both sources (feature could be in either)
-    var appData = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })};
-    var svcData = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })};
-    map.getSource('appontements').setData(appData);
-    map.getSource('services').setData(svcData);
+    updateServiceSources();
   }
 });
 
@@ -1365,16 +1371,16 @@ map.on('mouseup', function(e){
           invalidateBuildingsCache();
           map.getSource('company-buildings').setData(rebuildCompanyBuildings());
         }
+        // Hide service point — building takes over
+        feat.properties._onBuilding = true;
         showToast(feat.properties.nom + ' \u2014 place sur batiment');
       } else if (feat) {
+        feat.properties._onBuilding = false;
         showToast(feat.properties.nom + ' \u2014 deplac\u00e9');
       }
 
-      // Update service sources
-      var appData = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return f.properties.type && f.properties.type.indexOf('appontement') !== -1; })};
-      var svcData = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){ return !f.properties.type || f.properties.type.indexOf('appontement') === -1; })};
-      map.getSource('appontements').setData(appData);
-      map.getSource('services').setData(svcData);
+      // Update service sources — exclude services placed on buildings
+      updateServiceSources();
     }
 
     document.getElementById('exportBtn').classList.add('visible');
