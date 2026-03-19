@@ -930,6 +930,9 @@ function applyFilters() {
 
 function updateCounter(count) {
   document.getElementById('sidebarCounter').innerHTML = '<strong>'+count+'</strong> entreprise'+(count>1?'s':'')+' visible'+(count>1?'s':'');
+  // Update header badge with total
+  var totalEl = document.querySelector('.hud-badge span:first-child strong');
+  if(totalEl) totalEl.textContent = companiesGeoJSON.features.length;
 }
 
 // ══════════════════════════════════════════
@@ -1201,6 +1204,9 @@ function showCompanyDetail(p, clickLngLat) {
     else flags += '<span class="detail-flag off">GUP</span>';
     html += '<div class="detail-flags">'+flags+'</div>';
     html += '<button class="detail-cta">Contacter cette entreprise &rarr;</button>';
+    html += '<div style="display:flex;gap:6px;margin-top:8px">';
+    html += '<button class="reset-btn" style="margin:0;flex:1" onclick="deleteCompany('+p.id+')">Supprimer</button>';
+    html += '</div>';
     document.getElementById('detailBody').innerHTML = html;
   }
   panel.classList.add('open');
@@ -1406,8 +1412,21 @@ document.getElementById('modalSave').addEventListener('click', function(){
     }
   };
 
-  // Add to data
+  // Add point to companies data
   companiesGeoJSON.features.push(newFeature);
+
+  // Add the real IGN building polygon (not a cube) to matched buildings
+  if (pendingBuilding.geometry && typeof matchedBuildingsGeoJSON !== 'undefined') {
+    var bldgProps = {};
+    for (var k in newFeature.properties) bldgProps[k] = newFeature.properties[k];
+    bldgProps._height = pendingBuilding.hauteur || heightByDomain[domaine] || 12;
+    bldgProps._occupants = 1;
+    matchedBuildingsGeoJSON.features.push({
+      type:'Feature',
+      geometry: pendingBuilding.geometry,
+      properties: bldgProps
+    });
+  }
 
   // Update map sources
   invalidateBuildingsCache();
@@ -1821,6 +1840,25 @@ function rotateStep(){
 // Stop rotation on user interaction
 map.on('mousedown', function(){ if(isRotating){ isRotating=false; rotateBtn.classList.remove('active'); }});
 map.on('touchstart', function(){ if(isRotating){ isRotating=false; rotateBtn.classList.remove('active'); }});
+
+// ══════════════════════════════════════════
+// DELETE COMPANY
+// ══════════════════════════════════════════
+function deleteCompany(id) {
+  // Remove from companies
+  companiesGeoJSON.features = companiesGeoJSON.features.filter(function(f){ return f.properties.id != id; });
+  // Remove from matched buildings
+  if (typeof matchedBuildingsGeoJSON !== 'undefined') {
+    matchedBuildingsGeoJSON.features = matchedBuildingsGeoJSON.features.filter(function(f){ return f.properties.id != id; });
+  }
+  // Update map
+  invalidateBuildingsCache();
+  map.getSource('companies').setData(companiesGeoJSON);
+  map.getSource('company-buildings').setData(rebuildCompanyBuildings());
+  applyFilters();
+  hideDetail();
+  showToast('Entreprise supprimee');
+}
 
 // Watermark
 (function(){var w=document.createElement('div');w.style.cssText='position:fixed;bottom:24px;right:20px;z-index:50;font-size:0.65rem;color:rgba(255,255,255,0.2);font-family:Inter,sans-serif;pointer-events:none;';w.textContent='Demo \u2014 French4 Dev \u2014 jean-charles@french4.dev';document.body.appendChild(w);})();
