@@ -771,20 +771,27 @@ map.on('load', function() {
     return !f.properties.type || f.properties.type.indexOf('appontement') === -1;
   })};
 
-  // Appontements — dedicated layer with anchor icons
+  // Appontements — HTML markers with anchor icon
   map.addSource('appontements',{type:'geojson',data:appontementsGeoJSON});
-  map.addLayer({id:'appontements-circles',type:'circle',source:'appontements',paint:{
-    'circle-radius':['interpolate',['linear'],['zoom'],10,6,14,10,17,14],
-    'circle-color':['match',['get','type'],
-      'appontements croisières','#0D47A1',
-      'appontements mixtes','#006064',
-      'appontements mariniers','#004D40',
-      '#0D47A1'],
-    'circle-opacity':0.95,'circle-stroke-width':3,'circle-stroke-color':'#ffffff'}});
-  map.addLayer({id:'appontements-labels',type:'symbol',source:'appontements',minzoom:14,layout:{
-    'text-field':['get','nom'],'text-font':['Open Sans Bold'],'text-size':10,
-    'text-offset':[0,1.6],'text-anchor':'top','text-max-width':14
-  },paint:{'text-color':'#0D47A1','text-halo-color':'#ffffff','text-halo-width':2}});
+  var appontementMarkers = [];
+  var appColors = {'appontements croisi\u00e8res':'#0D47A1','appontements mixtes':'#006064','appontements mariniers':'#004D40'};
+  appontementsGeoJSON.features.forEach(function(f){
+    var p = f.properties;
+    var color = appColors[p.type] || '#0D47A1';
+    var el = document.createElement('div');
+    el.style.cssText = 'width:22px;height:22px;background:'+color+';border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);border:1.5px solid rgba(255,255,255,0.7);font-size:11px;transition:transform 0.2s;';
+    el.textContent = '\u2693';
+    el.title = p.nom;
+    el.addEventListener('mouseenter',function(){this.style.transform='scale(1.2)';});
+    el.addEventListener('mouseleave',function(){this.style.transform='';});
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      showServiceDetail(p);
+      map.easeTo({center:f.geometry.coordinates,duration:600});
+    });
+    var m = new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(f.geometry.coordinates).addTo(map);
+    appontementMarkers.push({marker:m,el:el});
+  });
 
   // Other services (restaurants, stations, etc.)
   map.addSource('services',{type:'geojson',data:otherServicesGeoJSON});
@@ -847,14 +854,8 @@ map.on('load', function() {
     if(!e.features||!e.features.length) return;
     showServiceDetail(e.features[0].properties);
   });
-  map.on('click','appontements-circles',function(e){
-    if(!e.features||!e.features.length) return;
-    showServiceDetail(e.features[0].properties);
-  });
   map.on('mouseenter','services-circles',function(){map.getCanvas().style.cursor='pointer';});
   map.on('mouseleave','services-circles',function(){map.getCanvas().style.cursor='';});
-  map.on('mouseenter','appontements-circles',function(){map.getCanvas().style.cursor='pointer';});
-  map.on('mouseleave','appontements-circles',function(){map.getCanvas().style.cursor='';});
 
   // Loading
   setTimeout(function(){document.getElementById('loading').classList.add('hidden');},600);
@@ -1050,8 +1051,7 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
           map.setLayoutProperty(id,'visibility',active?'visible':'none');
         });
       } else if(layer==='appontements'){
-        map.setLayoutProperty('appontements-circles','visibility',active?'visible':'none');
-        map.setLayoutProperty('appontements-labels','visibility',active?'visible':'none');
+        appontementMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
       } else if(layer==='services'){
         map.setLayoutProperty('services-circles','visibility',active?'visible':'none');
         map.setLayoutProperty('services-labels','visibility',active?'visible':'none');
@@ -1465,7 +1465,7 @@ var dragType = null; // 'company' or 'service'
 });
 
 // Mousedown on service or appontement circle
-['services-circles','appontements-circles'].forEach(function(layerId){
+['services-circles'].forEach(function(layerId){
   map.on('mousedown', layerId, function(e){
     if (!editMode || !e.features || !e.features.length) return;
     e.preventDefault();
