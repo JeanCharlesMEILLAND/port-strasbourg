@@ -806,10 +806,50 @@ function updateCounter(count) {
 // Search
 var searchBoxEl = document.getElementById('searchBox');
 var searchClearEl = document.getElementById('searchClear');
+var searchDebounce = null;
 searchBoxEl.addEventListener('input',function(){
   searchQuery = this.value.toLowerCase().trim();
   searchClearEl.classList.toggle('visible', this.value.length > 0);
   applyFilters();
+
+  // Auto-zoom to result if exactly 1 match (debounced)
+  clearTimeout(searchDebounce);
+  if (searchQuery.length >= 2) {
+    searchDebounce = setTimeout(function(){
+      // Check companies
+      var matchedCompany = companiesGeoJSON.features.filter(function(f){
+        return f.properties.nom.toLowerCase().indexOf(searchQuery) !== -1;
+      });
+      // Check services
+      var matchedService = servicesGeoJSON.features.filter(function(f){
+        return f.properties.nom.toLowerCase().indexOf(searchQuery) !== -1 ||
+          (f.properties.type && f.properties.type.toLowerCase().indexOf(searchQuery) !== -1);
+      });
+
+      var total = matchedCompany.length + matchedService.length;
+
+      if (total === 1) {
+        // Single result — zoom and open detail
+        if (matchedCompany.length === 1) {
+          var f = matchedCompany[0];
+          map.flyTo({center:f.geometry.coordinates, zoom:17, pitch:55, duration:1500});
+          setTimeout(function(){ showCompanyDetail(f.properties); }, 800);
+        } else {
+          var f = matchedService[0];
+          map.flyTo({center:f.geometry.coordinates, zoom:17, pitch:55, duration:1500});
+          setTimeout(function(){ showServiceDetail(f.properties); }, 800);
+        }
+      } else if (total > 1 && total <= 10) {
+        // Multiple results — fit bounds to show all
+        var coords = matchedCompany.map(function(f){return f.geometry.coordinates;})
+          .concat(matchedService.map(function(f){return f.geometry.coordinates;}));
+        var bounds = coords.reduce(function(b,c){
+          return b.extend(c);
+        }, new maplibregl.LngLatBounds(coords[0],coords[0]));
+        map.fitBounds(bounds, {padding:100, maxZoom:16, duration:1200});
+      }
+    }, 600);
+  }
 });
 searchClearEl.addEventListener('click',function(){
   searchBoxEl.value = '';
