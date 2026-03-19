@@ -761,7 +761,7 @@ map.on('load', function() {
     var p = f.properties;
     var color = appColors[p.type] || '#0D47A1';
     var el = document.createElement('div');
-    el.style.cssText = 'width:22px;height:22px;background:'+color+';border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);border:1.5px solid rgba(255,255,255,0.7);font-size:11px;transition:transform 0.2s;';
+    el.style.cssText = 'width:22px;height:22px;background:'+color+';border-radius:4px;display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);border:1.5px solid rgba(255,255,255,0.7);font-size:11px;transition:transform 0.2s;';
     el.textContent = '\u2693';
     el.title = p.nom;
     el.addEventListener('mouseenter',function(){this.style.transform='scale(1.2)';});
@@ -1019,7 +1019,7 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
           map.setLayoutProperty(id,'visibility',active?'visible':'none');
         });
       } else if(layer==='appontements'){
-        appontementMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
+        appontementMarkers.forEach(function(m){m.el.style.display=active?'flex':'none';});
       } else if(layer==='services'){
         map.setLayoutProperty('services-circles','visibility',active?'visible':'none');
         map.setLayoutProperty('services-labels','visibility',active?'visible':'none');
