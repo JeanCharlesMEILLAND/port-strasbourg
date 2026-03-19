@@ -614,11 +614,11 @@ var iteData = {type:"FeatureCollection",features:[
 ]};
 
 var quaisData = {type:"FeatureCollection",features:[
-  {type:"Feature",geometry:{type:"Point",coordinates:[7.760,48.527]},properties:{nom:"Quai 1 \u2014 Conteneurs",capacite:"2 peniches",tirant_eau:"3.5m",statut:"operationnel"}},
-  {type:"Feature",geometry:{type:"Point",coordinates:[7.762,48.530]},properties:{nom:"Quai 2 \u2014 Vracs solides",capacite:"1 peniche",tirant_eau:"2.8m",statut:"operationnel"}},
-  {type:"Feature",geometry:{type:"Point",coordinates:[7.798,48.614]},properties:{nom:"Quai Nord \u2014 Logistique",capacite:"3 peniches",tirant_eau:"3.2m",statut:"operationnel"}},
-  {type:"Feature",geometry:{type:"Point",coordinates:[7.764,48.540]},properties:{nom:"Quai 4 \u2014 Hydrocarbures",capacite:"1 peniche",tirant_eau:"4.0m",statut:"maintenance"}},
-  {type:"Feature",geometry:{type:"Point",coordinates:[7.756,48.522]},properties:{nom:"Quai Sud \u2014 Cereales",capacite:"2 peniches",tirant_eau:"3.0m",statut:"operationnel"}}
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.7876,48.5403]},properties:{nom:"Quai Bassin Dusuzeau \u2014 Conteneurs",capacite:"2 peniches",tirant_eau:"3.5m",statut:"operationnel"}},
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.7904,48.5475]},properties:{nom:"Quai Bassin du Commerce \u2014 Vracs",capacite:"1 peniche",tirant_eau:"2.8m",statut:"operationnel"}},
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.7935,48.5570]},properties:{nom:"Quai Bassin Vauban \u2014 General",capacite:"2 peniches",tirant_eau:"3.2m",statut:"operationnel"}},
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.7915,48.5690]},properties:{nom:"Quai Bassin aux Petroles",capacite:"1 peniche",tirant_eau:"4.0m",statut:"maintenance"}},
+  {type:"Feature",geometry:{type:"Point",coordinates:[7.7890,48.5830]},properties:{nom:"Quai Bassin de l'Industrie",capacite:"3 peniches",tirant_eau:"3.0m",statut:"operationnel"}}
 ]};
 
 
@@ -1095,9 +1095,13 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
         }
       } else if(layer==='ite'){
         showIte = active;
+        // Highlight real railways more when toggle is ON
+        map.setPaintProperty('railway-bg','line-color',active?'#CC6600':'#1a1a1a');
+        map.setPaintProperty('railway-bg','line-opacity',active?0.9:0.8);
+        map.setPaintProperty('railway','line-color',active?'#FFD700':'#ffffff');
         map.setLayoutProperty('ite-active','visibility',active?'visible':'none');
         map.setLayoutProperty('ite-inactive','visibility',active?'visible':'none');
-        quaiMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
+        quaiMarkers.forEach(function(m){m.el.style.display=active?'flex':'none';});
       } else if(layer==='energie'){
         showEnergie = active;
         map.setLayoutProperty('energie-existant','visibility',active?'visible':'none');
@@ -1858,7 +1862,15 @@ map.on('touchstart', function(){ if(isRotating){ isRotating=false; rotateBtn.cla
 // RAIL ANNOTATION SYSTEM
 // ══════════════════════════════════════════
 var railAnnotations = {};
+var PAS_API = 'https://carte-ite.iaklefer.fr/api/pas';
 try { railAnnotations = JSON.parse(localStorage.getItem('pas_rail_annotations')) || {}; } catch(e){}
+// Load annotations from DB on startup
+fetch(PAS_API+'?type=rail').then(function(r){return r.json();}).then(function(data){
+  if(Array.isArray(data)){
+    data.forEach(function(a){ railAnnotations[a.featureKey] = a.data; });
+    localStorage.setItem('pas_rail_annotations', JSON.stringify(railAnnotations));
+  }
+}).catch(function(){});
 
 function railKey(geom) {
   // Create a unique key from the first 2 coordinates
@@ -1867,8 +1879,14 @@ function railKey(geom) {
   return c[0][0].toFixed(4)+'_'+c[0][1].toFixed(4)+'_'+c[1][0].toFixed(4)+'_'+c[1][1].toFixed(4);
 }
 
-function saveRailAnnotations() {
+function saveRailAnnotations(key, data, geometry) {
   localStorage.setItem('pas_rail_annotations', JSON.stringify(railAnnotations));
+  // Also save to DB
+  if(key && data) {
+    fetch(PAS_API, {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'rail',featureKey:key,data:data,geometry:geometry||null})
+    }).catch(function(){});
+  }
 }
 
 // Click on rail
@@ -1919,7 +1937,7 @@ map.on('click','railway-bg',function(e){
 });
 
 function saveRailInfo(key) {
-  railAnnotations[key] = {
+  var annData = {
     nom: document.getElementById('railNom').value.trim(),
     gabarit: document.getElementById('railGabarit').value,
     etat: document.getElementById('railEtat').value,
@@ -1928,15 +1946,19 @@ function saveRailInfo(key) {
     charge: document.getElementById('railCharge').value.trim(),
     notes: document.getElementById('railNotes').value.trim()
   };
-  saveRailAnnotations();
-  showToast('Voie ferree enregistree');
+  railAnnotations[key] = annData;
+  saveRailAnnotations(key, annData);
+  showToast('Voie ferree enregistree (DB + local)');
   // Update title
   document.getElementById('detailName').textContent = railAnnotations[key].nom || 'Voie ferree';
 }
 
 function deleteRailInfo(key) {
   delete railAnnotations[key];
-  saveRailAnnotations();
+  localStorage.setItem('pas_rail_annotations', JSON.stringify(railAnnotations));
+  // Delete from DB
+  fetch(PAS_API,{method:'DELETE',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({type:'rail',featureKey:key})}).catch(function(){});
   hideDetail();
   map.getSource('rail-highlight').setData({type:'FeatureCollection',features:[]});
   showToast('Annotation supprimee');
