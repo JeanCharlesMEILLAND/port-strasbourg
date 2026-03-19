@@ -1038,6 +1038,11 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
         });
       } else if(layer==='appontements'){
         appontementMarkers.forEach(function(m){m.el.style.display=active?'flex':'none';});
+        if(active){
+          var bounds = new maplibregl.LngLatBounds();
+          servicesGeoJSON.features.filter(function(f){return f.properties.type&&f.properties.type.indexOf('appontement')!==-1;}).forEach(function(f){bounds.extend(f.geometry.coordinates);});
+          map.fitBounds(bounds,{padding:80,maxZoom:16,duration:1200});
+        }
       } else if(layer==='services'){
         map.setLayoutProperty('services-circles','visibility',active?'visible':'none');
         map.setLayoutProperty('services-labels','visibility',active?'visible':'none');
@@ -1045,8 +1050,23 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
         map.setLayoutProperty('sectors-fill','visibility',active?'visible':'none');
         map.setLayoutProperty('sectors-outline','visibility',active?'visible':'none');
         map.setLayoutProperty('sectors-labels','visibility',active?'visible':'none');
+        if(active){
+          // Fit to show all sectors
+          var bounds = new maplibregl.LngLatBounds();
+          sectorsGeoJSON.features.forEach(function(f){
+            var coords = f.geometry.type==='MultiPolygon' ? f.geometry.coordinates[0][0] : f.geometry.coordinates[0];
+            coords.forEach(function(c){bounds.extend(c);});
+          });
+          map.fitBounds(bounds,{padding:60,maxZoom:15,duration:1200});
+        }
       } else if(layer==='infra'){
         infraMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
+        if(active){
+          // Fit to show all infrastructure points
+          var bounds = new maplibregl.LngLatBounds();
+          portSites.forEach(function(s){bounds.extend(s.coords);});
+          map.fitBounds(bounds,{padding:80,maxZoom:13,duration:1200});
+        }
       } else if(layer==='ite'){
         showIte = active;
         map.setLayoutProperty('ite-active','visibility',active?'visible':'none');
