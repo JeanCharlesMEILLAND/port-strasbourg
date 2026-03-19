@@ -326,6 +326,7 @@ body {
   <div class="hud-views">
     <button class="view-btn active" data-view="3d">&#x1f3d9; Carte 3D</button>
     <button class="view-btn" data-view="satellite">&#x1f6f0; Satellite IGN</button>
+    <button class="view-btn" id="rotateBtn">&#x1f504; Rotation</button>
   </div>
   <div class="hud-badge">
     <span><strong>280</strong> entreprises</span>
@@ -347,7 +348,7 @@ body {
   <div class="sidebar-section">
     <div class="sidebar-section-title">Couches</div>
     <div class="toggle-row active" data-layer="entreprises"><span class="toggle-label">Entreprises (280)</span><div class="toggle-switch"></div></div>
-    <div class="toggle-row active" data-layer="appontements"><span class="toggle-label">Appontements (16)</span><div class="toggle-switch"></div></div>
+    <div class="toggle-row" data-layer="appontements"><span class="toggle-label">Appontements (16)</span><div class="toggle-switch"></div></div>
     <div class="toggle-row active" data-layer="services"><span class="toggle-label">Services (14)</span><div class="toggle-switch"></div></div>
     <div class="toggle-row" data-layer="secteurs"><span class="toggle-label">Zones secteurs</span><div class="toggle-switch"></div></div>
     <div class="toggle-row active" data-layer="infra"><span class="toggle-label">Infrastructure</span><div class="toggle-switch"></div></div>
@@ -357,12 +358,6 @@ body {
   <div class="sidebar-section">
     <div class="sidebar-section-title">Couches thematiques</div>
     <div class="toggle-row" data-layer="ite"><span class="toggle-label">&#x1f682; Voies ferrees &amp; quais</span><div class="toggle-switch"></div></div>
-    <div class="toggle-row active" data-layer="flux"><span class="toggle-label">&#x1f4e6; Flux de fret</span><div class="toggle-switch"></div></div>
-    <div class="layer-legend" id="fluxLegend">
-      <span class="legend-item"><span class="legend-line" style="background:#0078FF"></span>Fluvial</span>
-      <span class="legend-item"><span class="legend-line" style="background:#FF8C00"></span>Ferroviaire</span>
-      <span class="legend-item"><span class="legend-line" style="background:#64C864"></span>Routier</span>
-    </div>
     <div class="toggle-row" data-layer="energie"><span class="toggle-label">&#x26A1; Reseau R-PAS</span><div class="toggle-switch"></div></div>
     <div class="energy-counter" id="energyCounter">&#x26A1; <strong>25 MW</strong> recuperes &middot; ~<strong>10 800</strong> t CO&#x2082;/an evitees</div>
   </div>
@@ -599,17 +594,6 @@ var quaisData = {type:"FeatureCollection",features:[
   {type:"Feature",geometry:{type:"Point",coordinates:[7.756,48.522]},properties:{nom:"Quai Sud \u2014 Cereales",capacite:"2 peniches",tirant_eau:"3.0m",statut:"operationnel"}}
 ]};
 
-var fluxFret = [
-  {from:[7.546,48.083],to:[7.762,48.527],tonnage:280000,mode:"fluvial",label:"Cereales Marckolsheim \u2192 Terminal Sud"},
-  {from:[7.762,48.527],to:[7.803,48.618],tonnage:180000,mode:"ferroviaire",label:"Conteneurs Sud \u2192 Nord"},
-  {from:[7.762,48.527],to:[7.958,48.752],tonnage:150000,mode:"fluvial",label:"Vrac \u2192 Drusenheim"},
-  {from:[7.739,48.438],to:[7.762,48.527],tonnage:120000,mode:"ferroviaire",label:"Plobsheim \u2192 Terminal Sud"},
-  {from:[7.762,48.527],to:[8.178,48.973],tonnage:95000,mode:"fluvial",label:"Export \u2192 Lauterbourg"},
-  {from:[7.803,48.618],to:[7.784,48.661],tonnage:90000,mode:"routier",label:"Distribution urbaine"},
-  {from:[7.762,48.527],to:[7.546,48.083],tonnage:60000,mode:"ferroviaire",label:"Retour wagons vides"}
-];
-
-var fluxColors = {fluvial:'#0078FF',ferroviaire:'#FF8C00',routier:'#64C864'};
 
 var energieData = {
   producteurs:[
@@ -808,41 +792,6 @@ map.on('load', function() {
   map.addLayer({id:'ite-inactive',type:'line',source:'ite',filter:['==',['get','actif'],false],layout:{visibility:'none'},paint:{'line-color':'#666666','line-width':2,'line-dasharray':[4,4],'line-opacity':0.6}});
   map.addSource('quais',{type:'geojson',data:quaisData});
 
-  // ── THEMATIC: Flux de fret (curved arcs via Bezier) ──
-  function makeCurve(from, to, pts, curve) {
-    var dx = to[0]-from[0], dy = to[1]-from[1];
-    var mx = (from[0]+to[0])/2 - dy*curve;
-    var my = (from[1]+to[1])/2 + dx*curve;
-    var coords = [];
-    for (var i=0; i<=pts; i++) {
-      var t = i/pts;
-      coords.push([
-        (1-t)*(1-t)*from[0] + 2*(1-t)*t*mx + t*t*to[0],
-        (1-t)*(1-t)*from[1] + 2*(1-t)*t*my + t*t*to[1]
-      ]);
-    }
-    return coords;
-  }
-  var fluxGeoJSON = {type:'FeatureCollection',features:fluxFret.map(function(f,i){
-    var curvature = (i % 2 === 0 ? 0.15 : -0.12);
-    return {type:'Feature',geometry:{type:'LineString',coordinates:makeCurve(f.from,f.to,30,curvature)},properties:{mode:f.mode,tonnage:f.tonnage,label:f.label,idx:i}};
-  })};
-  map.addSource('flux',{type:'geojson',data:fluxGeoJSON});
-  // Glow effect (wider, blurred)
-  map.addLayer({id:'flux-glow',type:'line',source:'flux',paint:{
-    'line-color':['match',['get','mode'],'fluvial','#0078FF','ferroviaire','#FF8C00','routier','#64C864','#999'],
-    'line-width':['interpolate',['linear'],['get','tonnage'],50000,6,300000,16],
-    'line-opacity':0.12,'line-blur':4
-  }});
-  map.addLayer({id:'flux-lines',type:'line',source:'flux',paint:{
-    'line-color':['match',['get','mode'],'fluvial','#0078FF','ferroviaire','#FF8C00','routier','#64C864','#999'],
-    'line-width':['interpolate',['linear'],['get','tonnage'],50000,1.5,300000,4],
-    'line-opacity':0.7,'line-dasharray':[2,2]
-  }});
-  map.addLayer({id:'flux-labels',type:'symbol',source:'flux',minzoom:10,layout:{
-    'symbol-placement':'line-center','text-field':['get','label'],'text-font':['Open Sans Regular'],
-    'text-size':9,'text-allow-overlap':false
-  },paint:{'text-color':'#555','text-halo-color':'#fff','text-halo-width':1.5}});
 
   // ── THEMATIC: Energie R-PAS ──
   map.addSource('energie-reseau',{type:'geojson',data:energieData.reseau});
@@ -1085,12 +1034,6 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
         map.setLayoutProperty('ite-active','visibility',active?'visible':'none');
         map.setLayoutProperty('ite-inactive','visibility',active?'visible':'none');
         quaiMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
-      } else if(layer==='flux'){
-        showFluxLayer = active;
-        map.setLayoutProperty('flux-glow','visibility',active?'visible':'none');
-        map.setLayoutProperty('flux-lines','visibility',active?'visible':'none');
-        map.setLayoutProperty('flux-labels','visibility',active?'visible':'none');
-        document.getElementById('fluxLegend').style.display=active?'flex':'none';
       } else if(layer==='energie'){
         showEnergie = active;
         map.setLayoutProperty('energie-existant','visibility',active?'visible':'none');
@@ -1666,7 +1609,7 @@ document.getElementById('exportBtn').addEventListener('click', function(){
 // ══════════════════════════════════════════
 var quaiMarkers = [];
 var energyMarkers = [];
-var showIte = false, showFluxLayer = true, showEnergie = false;
+var showIte = false, showEnergie = false;
 
 // Create quai markers (hidden by default)
 quaisData.features.forEach(function(f){
@@ -1747,31 +1690,6 @@ map.on('click','ite-inactive',function(e){
   map.on('mouseleave',id,function(){map.getCanvas().style.cursor='';});
 });
 
-// Flux click
-map.on('click','flux-lines',function(e){
-  if(!e.features||!e.features.length) return;
-  var p = e.features[0].properties;
-  var panel = document.getElementById('detailPanel');
-  document.getElementById('detailBar').style.background = 'linear-gradient(90deg,'+(fluxColors[p.mode]||'#999')+',transparent)';
-  document.getElementById('detailName').textContent = p.label;
-  document.getElementById('detailBadges').innerHTML = '<span class="detail-badge" style="color:'+(fluxColors[p.mode]||'#999')+';border-color:currentColor;background:rgba(255,255,255,0.05)">'+p.mode+'</span>';
-  document.getElementById('detailBody').innerHTML =
-    '<div class="detail-row"><div class="detail-row-icon">\u{1F4E6}</div><div class="detail-row-content"><div class="detail-row-label">Tonnage</div><div class="detail-row-value">'+(p.tonnage/1000)+' kt/an</div></div></div>';
-  panel.classList.add('open');
-});
-map.on('mouseenter','flux-lines',function(){map.getCanvas().style.cursor='pointer';});
-map.on('mouseleave','flux-lines',function(){map.getCanvas().style.cursor='';});
-
-// Flux dash animation
-var fluxDashStep = 0;
-function animateFlux(){
-  fluxDashStep = (fluxDashStep + 0.15) % 4;
-  if(map.getLayer('flux-lines') && showFluxLayer){
-    map.setPaintProperty('flux-lines','line-dasharray',[2, fluxDashStep + 1]);
-  }
-  requestAnimationFrame(animateFlux);
-}
-animateFlux();
 
 // ITE dash animation
 var iteDashStep = 0;
@@ -1833,6 +1751,28 @@ function runComparator(){
   });
   document.getElementById('compResults').innerHTML = html;
 }
+
+// ══════════════════════════════════════════
+// AUTO-ROTATION
+// ══════════════════════════════════════════
+var isRotating = false;
+var rotateBtn = document.getElementById('rotateBtn');
+rotateBtn.addEventListener('click', function(){
+  isRotating = !isRotating;
+  this.classList.toggle('active', isRotating);
+  if (isRotating) {
+    map.easeTo({pitch:55, duration:800});
+    rotateStep();
+  }
+});
+function rotateStep(){
+  if (!isRotating) return;
+  map.easeTo({bearing: map.getBearing() - 0.3, duration:0, easing:function(t){return t;}});
+  requestAnimationFrame(rotateStep);
+}
+// Stop rotation on user interaction
+map.on('mousedown', function(){ if(isRotating){ isRotating=false; rotateBtn.classList.remove('active'); }});
+map.on('touchstart', function(){ if(isRotating){ isRotating=false; rotateBtn.classList.remove('active'); }});
 
 // Watermark
 (function(){var w=document.createElement('div');w.style.cssText='position:fixed;bottom:24px;right:20px;z-index:50;font-size:0.65rem;color:rgba(255,255,255,0.2);font-family:Inter,sans-serif;pointer-events:none;';w.textContent='Demo \u2014 French4 Dev \u2014 jean-charles@french4.dev';document.body.appendChild(w);})();
