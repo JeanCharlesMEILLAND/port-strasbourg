@@ -709,6 +709,17 @@ function applyFilters() {
   var filteredBldg = {type:'FeatureCollection', features: allBuildings.features.filter(function(f){ return matchesFilters(f.properties); })};
   map.getSource('company-buildings').setData(filteredBldg);
 
+  // Filter services too (by search query)
+  if (searchQuery) {
+    var filteredSvc = {type:'FeatureCollection', features: servicesGeoJSON.features.filter(function(f){
+      return f.properties.nom.toLowerCase().indexOf(searchQuery) !== -1 ||
+        (f.properties.type && f.properties.type.toLowerCase().indexOf(searchQuery) !== -1);
+    })};
+    map.getSource('services').setData(filteredSvc);
+  } else {
+    map.getSource('services').setData(servicesGeoJSON);
+  }
+
   // Clear layer filters (we filter at source level now)
   ['companies-circles','companies-circles-hi','companies-labels','company-buildings-3d','company-buildings-outline'].forEach(function(id){
     try { map.setFilter(id, null); } catch(e){}
@@ -1141,11 +1152,13 @@ document.getElementById('modalSave').addEventListener('click', function(){
 });
 
 // Mousedown on company circle OR 3D building
+var dragType = null; // 'company' or 'service'
 ['companies-circles','companies-circles-hi','company-buildings-3d'].forEach(function(layerId){
   map.on('mousedown', layerId, function(e){
     if (!editMode || !e.features || !e.features.length) return;
     e.preventDefault();
     isDragging = true;
+    dragType = 'company';
     dragFeatureId = e.features[0].properties.id;
     map.getCanvas().style.cursor = 'grabbing';
     map.dragPan.disable();
@@ -1153,83 +1166,108 @@ document.getElementById('modalSave').addEventListener('click', function(){
   });
 });
 
-// Mousemove — update point, hide old building during drag
+// Mousedown on service circle
+map.on('mousedown', 'services-circles', function(e){
+  if (!editMode || !e.features || !e.features.length) return;
+  e.preventDefault();
+  isDragging = true;
+  dragType = 'service';
+  dragFeatureId = e.features[0].properties.id;
+  map.getCanvas().style.cursor = 'grabbing';
+  map.dragPan.disable();
+  map.dragRotate.disable();
+});
+
+// Mousemove — update point position during drag
 map.on('mousemove', function(e){
   if (!isDragging || dragFeatureId === null) return;
   var coords = [e.lngLat.lng, e.lngLat.lat];
-  for (var i = 0; i < companiesGeoJSON.features.length; i++) {
-    if (companiesGeoJSON.features[i].properties.id == dragFeatureId) {
-      companiesGeoJSON.features[i].geometry.coordinates = coords;
-      break;
+
+  if (dragType === 'company') {
+    for (var i = 0; i < companiesGeoJSON.features.length; i++) {
+      if (companiesGeoJSON.features[i].properties.id == dragFeatureId) {
+        companiesGeoJSON.features[i].geometry.coordinates = coords;
+        break;
+      }
     }
+    map.getSource('companies').setData(companiesGeoJSON);
+    var buildings = rebuildCompanyBuildings();
+    buildings.features = buildings.features.filter(function(f){ return f.properties.id != dragFeatureId; });
+    map.getSource('company-buildings').setData(buildings);
+  } else if (dragType === 'service') {
+    for (var i = 0; i < servicesGeoJSON.features.length; i++) {
+      if (servicesGeoJSON.features[i].properties.id == dragFeatureId) {
+        servicesGeoJSON.features[i].geometry.coordinates = coords;
+        break;
+      }
+    }
+    map.getSource('services').setData(servicesGeoJSON);
   }
-  map.getSource('companies').setData(companiesGeoJSON);
-  // Hide the old building for the dragged company — show only the moving point
-  var buildings = rebuildCompanyBuildings();
-  buildings.features = buildings.features.filter(function(f){ return f.properties.id != dragFeatureId; });
-  map.getSource('company-buildings').setData(buildings);
 });
 
-// Mouseup — finalize: snap to IGN building under drop position
+// Mouseup — finalize drag
 map.on('mouseup', function(e){
   if (!isDragging) return;
   if (dragFeatureId !== null) {
-    movedIds.add(dragFeatureId);
-    var feat = companiesGeoJSON.features.find(function(f){ return f.properties.id == dragFeatureId; });
+    movedIds.add(dragType + '_' + dragFeatureId);
 
-    // Try to find the IGN building at the drop location
-    var pixel = e.point || map.project(e.lngLat);
-    var bldgHits = map.queryRenderedFeatures(
-      [[pixel.x-25, pixel.y-25],[pixel.x+25, pixel.y+25]],
-      {layers:['buildings-flat']}
-    );
+    if (dragType === 'company') {
+      var feat = companiesGeoJSON.features.find(function(f){ return f.properties.id == dragFeatureId; });
 
-    if (bldgHits.length > 0 && feat) {
-      var bldg = bldgHits[0];
-      var props = {};
-      for (var k in feat.properties) props[k] = feat.properties[k];
-      props._height = bldg.properties.hauteur || heightByDomain[feat.properties.domaine] || 12;
-      props._usage = bldg.properties.usage_1 || '';
-      props._occupants = 1;
+      // Try to find the IGN building at the drop location
+      var pixel = e.point || map.project(e.lngLat);
+      var bldgHits = map.queryRenderedFeatures(
+        [[pixel.x-25, pixel.y-25],[pixel.x+25, pixel.y+25]],
+        {layers:['buildings-flat']}
+      );
 
-      // Remove old entry from matchedBuildingsGeoJSON and add new one with real building shape
-      if (typeof matchedBuildingsGeoJSON !== 'undefined') {
-        matchedBuildingsGeoJSON.features = matchedBuildingsGeoJSON.features.filter(function(f){
-          return f.properties.id != dragFeatureId;
-        });
-        matchedBuildingsGeoJSON.features.push({
-          type:'Feature',
-          geometry: bldg.geometry,
-          properties: props
-        });
+      if (bldgHits.length > 0 && feat) {
+        var bldg = bldgHits[0];
+        var props = {};
+        for (var k in feat.properties) props[k] = feat.properties[k];
+        props._height = bldg.properties.hauteur || heightByDomain[feat.properties.domaine] || 12;
+        props._usage = bldg.properties.usage_1 || '';
+        props._occupants = 1;
+        if (typeof matchedBuildingsGeoJSON !== 'undefined') {
+          matchedBuildingsGeoJSON.features = matchedBuildingsGeoJSON.features.filter(function(f){
+            return f.properties.id != dragFeatureId;
+          });
+          matchedBuildingsGeoJSON.features.push({type:'Feature', geometry:bldg.geometry, properties:props});
+        }
+        showToast(feat.properties.nom + ' \u2014 place sur batiment IGN');
+      } else if (feat) {
+        if (typeof matchedBuildingsGeoJSON !== 'undefined') {
+          matchedBuildingsGeoJSON.features = matchedBuildingsGeoJSON.features.filter(function(f){
+            return f.properties.id != dragFeatureId;
+          });
+        }
+        showToast(feat.properties.nom + ' \u2014 deplac\u00e9');
       }
-      showToast(feat.properties.nom + ' — place sur batiment IGN (' + (bldg.properties.hauteur||'?') + ' m)');
-    } else if (feat) {
-      // No building found — remove from pre-computed (will show as circle)
-      if (typeof matchedBuildingsGeoJSON !== 'undefined') {
-        matchedBuildingsGeoJSON.features = matchedBuildingsGeoJSON.features.filter(function(f){
-          return f.properties.id != dragFeatureId;
-        });
+      invalidateBuildingsCache();
+      map.getSource('companies').setData(companiesGeoJSON);
+      map.getSource('company-buildings').setData(rebuildCompanyBuildings());
+
+    } else if (dragType === 'service') {
+      var feat = servicesGeoJSON.features.find(function(f){ return f.properties.id == dragFeatureId; });
+      if (feat) {
+        var c = feat.geometry.coordinates;
+        showToast(feat.properties.nom + ' \u2014 deplac\u00e9 (' + c[1].toFixed(5) + ', ' + c[0].toFixed(5) + ')');
       }
-      var c = feat.geometry.coordinates;
-      showToast(feat.properties.nom + ' — deplac\u00e9 (pas de batiment)');
+      map.getSource('services').setData(servicesGeoJSON);
     }
 
-    // Refresh map
-    invalidateBuildingsCache();
-    map.getSource('companies').setData(companiesGeoJSON);
-    map.getSource('company-buildings').setData(rebuildCompanyBuildings());
     document.getElementById('exportBtn').classList.add('visible');
   }
   isDragging = false;
   dragFeatureId = null;
+  dragType = null;
   map.getCanvas().style.cursor = editMode ? 'crosshair' : '';
   map.dragPan.enable();
   map.dragRotate.enable();
 });
 
 // Hover cursor in edit mode
-['companies-circles','companies-circles-hi','company-buildings-3d'].forEach(function(layerId){
+['companies-circles','companies-circles-hi','company-buildings-3d','services-circles'].forEach(function(layerId){
   map.on('mouseenter', layerId, function(){
     if (editMode) map.getCanvas().style.cursor = 'grab';
   });
@@ -1238,25 +1276,20 @@ map.on('mouseup', function(e){
   });
 });
 
-// Export — moved positions + new companies
+// Export — moved positions + new companies + moved services
 document.getElementById('exportBtn').addEventListener('click', function(){
-  var moved = companiesGeoJSON.features.filter(function(f){ return movedIds.has(f.properties.id); });
+  var movedCompanies = companiesGeoJSON.features.filter(function(f){ return movedIds.has('company_'+f.properties.id); });
   var added = companiesGeoJSON.features.filter(function(f){ return f.properties._new; });
-  var all = moved.concat(added);
-  var json = all.map(function(f){
+  var movedServices = servicesGeoJSON.features.filter(function(f){ return movedIds.has('service_'+f.properties.id); });
+  var json = [];
+  movedCompanies.concat(added).forEach(function(f){
     var p = f.properties;
-    var out = {id:p.id, nom:p.nom, lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0]};
-    if (p._new) {
-      out.nouveau = true;
-      out.domaine = p.domaine;
-      out.adresse = p.adresse;
-      out.ville = p.ville;
-      out.cp = p.cp;
-      out.tel = p.tel;
-      out.email = p.email;
-      out.website = p.website;
-    }
-    return out;
+    var out = {type:'entreprise', id:p.id, nom:p.nom, lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0]};
+    if (p._new) { out.nouveau = true; out.domaine = p.domaine; out.adresse = p.adresse; out.ville = p.ville; out.cp = p.cp; out.tel = p.tel; out.email = p.email; out.website = p.website; }
+    json.push(out);
+  });
+  movedServices.forEach(function(f){
+    json.push({type:'service', id:f.properties.id, nom:f.properties.nom, serviceType:f.properties.type, lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0]});
   });
   navigator.clipboard.writeText(JSON.stringify(json, null, 2)).then(function(){
     var msg = '';
