@@ -376,7 +376,7 @@ body {
     <div class="sidebar-section-title">Couches thematiques</div>
     <div class="toggle-row" data-layer="ite"><span class="toggle-label">&#x1f682; Voies ferrees &amp; quais</span><div class="toggle-switch"></div></div>
     <div class="toggle-row" data-layer="energie"><span class="toggle-label">&#x26A1; Reseau R-PAS</span><div class="toggle-switch"></div></div>
-    <div class="energy-counter" id="energyCounter">&#x26A1; <strong>25 MW</strong> recuperes &middot; ~<strong>10 800</strong> t CO&#x2082;/an evitees</div>
+    <div class="energy-counter" id="energyCounter">&#x26A1; <strong>15 MW</strong> &middot; <strong>45 GWh</strong>/an &middot; ~<strong>11 000</strong> t CO&#x2082;/an evitees<br><span style="font-size:0.62rem;color:var(--text-muted)">93% EnR &middot; 11 km &middot; Invest. 40 M&#x20AC; &middot; SAS R-CUA/PAS/CDC</span></div>
   </div>
 
   <div class="sidebar-section">
@@ -622,20 +622,29 @@ var quaisData = {type:"FeatureCollection",features:[
 ]};
 
 
+// R-PAS : donnees reelles (sources: strasbourg.port.fr, bluepaper.eu, groupe-seche.com, france-chaleur-urbaine)
+// Reseau 15 MW, 45 GWh/an, 93.4% EnR, 11 km, ~11 000 t CO2/an evitees
 var energieData = {
   producteurs:[
-    {coords:[7.762,48.528],nom:"Blue Paper",chaleur_mw:12,type:"Vapeur process",color:"#FF4444"},
-    {coords:[7.764,48.533],nom:"Lesaffre Panification",chaleur_mw:8,type:"Chaleur fermentation",color:"#FF6622"},
-    {coords:[7.758,48.524],nom:"Soprema",chaleur_mw:5,type:"Chaleur compression",color:"#FF8800"}
+    {coords:[7.796,48.555],nom:"Blue Paper (ex-Stracel)",chaleur_mw:6,type:"Cogenerateur biomasse + fumees \u2014 100 GWh/an",color:"#FF4444"},
+    {coords:[7.788,48.535],nom:"Tredi (Groupe Seche)",chaleur_mw:6,type:"Traitement thermique dechets \u2014 50 GWh/an",color:"#FF6622"},
+    {coords:[7.798,48.560],nom:"Station d'epuration (prevu)",chaleur_mw:3,type:"Recuperation chaleur eaux usees \u2014 20 GWh/an",color:"#FF8800"}
   ],
   consommateurs:[
-    {coords:[7.750,48.518],nom:"Quartier Neuhof",besoin_mw:9,type:"Chauffage urbain",color:"#2288FF"},
-    {coords:[7.770,48.535],nom:"Zone logistique Est",besoin_mw:6,type:"Chauffage entrepots",color:"#4499FF"}
+    {coords:[7.786,48.567],nom:"Clinique Rhena",besoin_mw:4,type:"1er raccorde (juin 2021)",color:"#2288FF"},
+    {coords:[7.794,48.573],nom:"Quartier Coop (ecoquartier)",besoin_mw:3,type:"Chauffage urbain",color:"#4499FF"},
+    {coords:[7.770,48.590],nom:"Quartier Wacken (Eco2Wacken)",besoin_mw:5,type:"Chauffage urbain + piscine",color:"#3388FF"},
+    {coords:[7.791,48.578],nom:"Siege Ports de Strasbourg",besoin_mw:1,type:"Bureaux",color:"#5599FF"},
+    {coords:[7.795,48.553],nom:"Malteries Soufflet",besoin_mw:2,type:"Industrie agroalimentaire",color:"#66AAFF"}
   ],
   reseau:{type:"FeatureCollection",features:[
-    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.762,48.528],[7.756,48.525],[7.750,48.518]]},properties:{puissance_mw:12,statut:"existant"}},
-    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.764,48.533],[7.770,48.535]]},properties:{puissance_mw:8,statut:"projet"}},
-    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.758,48.524],[7.754,48.521],[7.750,48.518]]},properties:{puissance_mw:5,statut:"projet"}}
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.796,48.555],[7.794,48.558],[7.791,48.562],[7.786,48.567]]},properties:{puissance_mw:6,statut:"existant",label:"Blue Paper \u2192 Rhena"}},
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.786,48.567],[7.788,48.570],[7.794,48.573]]},properties:{puissance_mw:4,statut:"existant",label:"Rhena \u2192 Quartier Coop"}},
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.794,48.573],[7.789,48.578],[7.791,48.578]]},properties:{puissance_mw:3,statut:"existant",label:"Coop \u2192 Siege PAS"}},
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.791,48.578],[7.780,48.583],[7.770,48.590]]},properties:{puissance_mw:5,statut:"projet",label:"Extension Wacken (9 km)"}},
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.788,48.535],[7.790,48.542],[7.793,48.550],[7.796,48.555]]},properties:{puissance_mw:6,statut:"existant",label:"Tredi \u2192 Blue Paper"}},
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.796,48.555],[7.795,48.553]]},properties:{puissance_mw:2,statut:"existant",label:"Blue Paper \u2192 Malteries Soufflet"}},
+    {type:"Feature",geometry:{type:"LineString",coordinates:[[7.798,48.560],[7.796,48.558],[7.796,48.555]]},properties:{puissance_mw:3,statut:"projet",label:"Station epuration (prevu fin 2024)"}}
   ]}
 };
 
