@@ -808,15 +808,36 @@ map.on('load', function() {
   map.addLayer({id:'ite-inactive',type:'line',source:'ite',filter:['==',['get','actif'],false],layout:{visibility:'none'},paint:{'line-color':'#666666','line-width':2,'line-dasharray':[4,4],'line-opacity':0.6}});
   map.addSource('quais',{type:'geojson',data:quaisData});
 
-  // ── THEMATIC: Flux de fret (animated lines via MapLibre) ──
+  // ── THEMATIC: Flux de fret (curved arcs via Bezier) ──
+  function makeCurve(from, to, pts, curve) {
+    var dx = to[0]-from[0], dy = to[1]-from[1];
+    var mx = (from[0]+to[0])/2 - dy*curve;
+    var my = (from[1]+to[1])/2 + dx*curve;
+    var coords = [];
+    for (var i=0; i<=pts; i++) {
+      var t = i/pts;
+      coords.push([
+        (1-t)*(1-t)*from[0] + 2*(1-t)*t*mx + t*t*to[0],
+        (1-t)*(1-t)*from[1] + 2*(1-t)*t*my + t*t*to[1]
+      ]);
+    }
+    return coords;
+  }
   var fluxGeoJSON = {type:'FeatureCollection',features:fluxFret.map(function(f,i){
-    return {type:'Feature',geometry:{type:'LineString',coordinates:[f.from,f.to]},properties:{mode:f.mode,tonnage:f.tonnage,label:f.label,idx:i}};
+    var curvature = (i % 2 === 0 ? 0.15 : -0.12);
+    return {type:'Feature',geometry:{type:'LineString',coordinates:makeCurve(f.from,f.to,30,curvature)},properties:{mode:f.mode,tonnage:f.tonnage,label:f.label,idx:i}};
   })};
   map.addSource('flux',{type:'geojson',data:fluxGeoJSON});
+  // Glow effect (wider, blurred)
+  map.addLayer({id:'flux-glow',type:'line',source:'flux',paint:{
+    'line-color':['match',['get','mode'],'fluvial','#0078FF','ferroviaire','#FF8C00','routier','#64C864','#999'],
+    'line-width':['interpolate',['linear'],['get','tonnage'],50000,6,300000,16],
+    'line-opacity':0.12,'line-blur':4
+  }});
   map.addLayer({id:'flux-lines',type:'line',source:'flux',paint:{
     'line-color':['match',['get','mode'],'fluvial','#0078FF','ferroviaire','#FF8C00','routier','#64C864','#999'],
-    'line-width':['interpolate',['linear'],['get','tonnage'],50000,2,300000,7],
-    'line-opacity':0.6,'line-dasharray':[2,3]
+    'line-width':['interpolate',['linear'],['get','tonnage'],50000,1.5,300000,4],
+    'line-opacity':0.7,'line-dasharray':[2,2]
   }});
   map.addLayer({id:'flux-labels',type:'symbol',source:'flux',minzoom:10,layout:{
     'symbol-placement':'line-center','text-field':['get','label'],'text-font':['Open Sans Regular'],
@@ -1066,6 +1087,7 @@ document.querySelectorAll('.toggle-row').forEach(function(row){
         quaiMarkers.forEach(function(m){m.el.style.display=active?'':'none';});
       } else if(layer==='flux'){
         showFluxLayer = active;
+        map.setLayoutProperty('flux-glow','visibility',active?'visible':'none');
         map.setLayoutProperty('flux-lines','visibility',active?'visible':'none');
         map.setLayoutProperty('flux-labels','visibility',active?'visible':'none');
         document.getElementById('fluxLegend').style.display=active?'flex':'none';
